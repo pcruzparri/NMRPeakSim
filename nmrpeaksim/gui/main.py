@@ -7,17 +7,17 @@ import numpy as np
 
 dpg.create_context()
 dpg.create_viewport(title='NMRPeakSim')
-vpw = dpg.get_viewport_width()
-vph = dpg.get_viewport_height()
-spect_gui = {"width": vpw*2//3,
-             "height": vph*2//3,
-             "pos": (0, 0)}
-peak_gui = {"width": vpw*2//3,
-            "height": vph*1//3,
-            "pos": (0, vph*2//3+20)}
-options_gui = {"width": vpw*1//3-40,
-               "height": vph*2//3,
-               "pos": (vpw*2//3+20, 0)}
+vpw = dpg.get_viewport_client_width()
+vph = dpg.get_viewport_client_height()
+spect_gui = {"width": -1,
+             "height": -1,
+             "pos": (0, vph//2)}
+peak_gui = {"width": vpw*4//5,
+            "height": vph//2,
+            "pos": (0, 0)}
+options_gui = {"width": -1,
+               "height": vph//2,
+               "pos": (vpw*4//5, 0)}
 message_gui = {"width": vpw*1//3-40,
                "height": vph*1//3,
                "pos": (vpw*2//3+20, vph*2//3+20)}
@@ -30,33 +30,30 @@ selected_peak = 0
 with dpg.window(tag='main_window'):
     # Plotting Spectrum
     with dpg.child_window(pos=spect_gui['pos'],
-                          autosize_x=True,
+                          width=spect_gui['width'],
+                          height=spect_gui['height'],
                           tag='plot_window'):
         with dpg.plot(label='Spectrum View',
-                      width=spect_gui['width'],
-                      height=spect_gui['height'],
+                      width=-1,
+                      height=-1,
                       tag='main_plot'):
             dpg.add_plot_axis(dpg.mvXAxis, label='ppm', tag='spect_x_axis', invert=True)
             dpg.add_plot_axis(dpg.mvYAxis, label='Intensity', tag='spect_y_axis')
-            dpg.add_line_series(spectrum.ppm, np.zeros(len(spectrum.ppm)),
-                                tag='spectrum_line',
-                                parent='spect_y_axis')
             dpg.set_axis_limits('spect_x_axis', 0, 10)
             dpg.add_plot_legend()
 
     # Plotting Peak
     with dpg.child_window(pos=peak_gui['pos'],
-                          autosize_x=True,
-                          autosize_y=True,
+                          width=peak_gui['width'],
+                          height=peak_gui['height'],
                           tag='peak_window'):
         with dpg.plot(label='Peak View',
-                      width=peak_gui['width'],
+                      width=-1,
+                      height=-1,
                       tag='peak_plot'):
             dpg.add_plot_axis(dpg.mvXAxis, label='ppm', tag='peak_x_axis', invert=True)
             dpg.add_plot_axis(dpg.mvYAxis, label='Intensity', tag='peak_y_axis')
-            dpg.add_line_series(spectrum.ppm, np.zeros(len(spectrum.ppm)),
-                                tag='peak_line',
-                                parent='peak_y_axis')
+            dpg.add_line_series([], [], parent='peak_y_axis', tag='view_peak_line')
 
     # Tools
     with dpg.child_window(label="Tools",
@@ -64,7 +61,6 @@ with dpg.window(tag='main_window'):
                           height=options_gui['height'],
                           pos=options_gui['pos'],
                           autosize_x=True,
-                          autosize_y=True,
                           tag='tools_window'):
         with dpg.tab_bar(label='Tools'):
 
@@ -73,7 +69,8 @@ with dpg.window(tag='main_window'):
                 dpg.add_combo(label='peak',
                               tag='peak_select',
                               user_data=(spectrum, peaks, selected_peak),
-                              callback=cb.psu_wrapper)
+                              callback=cb.psu_wrapper,
+                              width=200)
                 with dpg.group(tag='peak_creation'):
                     dpg.add_input_float(label="Shift (ppm)",
                                         default_value=5,

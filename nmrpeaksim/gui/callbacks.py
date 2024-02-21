@@ -10,8 +10,7 @@ def peak_creation_callback(sender, app_data, user_data):
     kwargs = {dpg.get_item_alias(k): dpg.get_value(k) for k in dpg.get_item_children(parent)[1]
               if 'mvButton' != dpg.get_item_type(k).split('::')[1]}
     getattr(user_data[0], sender)(**kwargs)
-    ind, peak = peak_select_update(*user_data)
-    update_plots(user_data[0], ind=ind, peak_label=peak)
+    peak_select_update(*user_data)
 
 
 def peak_modify_callback(sender, app_data, user_data):
@@ -23,8 +22,7 @@ def peak_modify_callback(sender, app_data, user_data):
         kwargs = {dpg.get_item_alias(k): dpg.get_value(k) for k in dpg.get_item_children(parent)[1]
                   if 'mvButton' != dpg.get_item_type(k).split('::')[1]}
         getattr(user_data[0], 'modify')(ind, sender, **kwargs)
-    ind, peak = peak_select_update(*user_data)
-    update_plots(user_data[0], ind=ind, peak_label=peak)
+    peak_select_update(*user_data)
 
 
 def spectrum_callback(sender, app_data, user_data):
@@ -71,21 +69,23 @@ def peak_select_update(spectrum, peaks, selected_peak):
                 dpg.set_value('peak_select', peak_labels[selected_peak])
         else:
             dpg.set_value('peak_select', peaks[selected_peak])
-    update_plots(spectrum, ind=selected_peak, peak_label=peak_labels[selected_peak])
+    update_peak_plot(spectrum, ind=selected_peak, label=peak_labels[selected_peak])
+    update_spectrum_plot(spectrum)
     return selected_peak, peak_labels[selected_peak]
 
 
-def update_plots(spectrum, ind=None, peak_label=None):
-    sp = spectrum.plot(internal=False)
-    pk = spectrum.plot(internal=False, peak_int=ind)
-
-    dpg.set_value('spectrum_line', sp)
-    dpg.fit_axis_data('spect_y_axis')
-    dpg.fit_axis_data('spect_x_axis')
-
-    dpg.set_value('peak_line', pk)
-    dpg.configure_item('peak_plot', label=f'Peak View {peak_label}')
+def update_peak_plot(spectrum, ind=0, label=''):
+    peak = spectrum.plot_peak(peak_int=ind)
+    dpg.set_value('view_peak_line', peak)
+    dpg.configure_item('peak_plot', label=f'Peak View {label}')
     dpg.fit_axis_data('peak_y_axis')
-    dpg.fit_axis_data('peak_x_axis')
-    peak_x = dpg.get_value('peak_line')[0]
-    dpg.set_axis_limits('peak_x_axis', peak_x[0], peak_x[-1])
+    peak_x = dpg.get_value('view_peak_line')[0]
+    dpg.set_axis_limits('peak_x_axis', peak_x[-1], peak_x[0])
+
+
+def update_spectrum_plot(spectrum):
+    dpg.delete_item('spect_y_axis', children_only=True)
+    peaks = spectrum.plot_all()
+    for ind, peak in enumerate(peaks):
+        dpg.add_line_series(*peak, parent='spect_y_axis', label=f'{ind}: {repr(spectrum.peaks[ind])}')
+    dpg.fit_axis_data('spect_y_axis')

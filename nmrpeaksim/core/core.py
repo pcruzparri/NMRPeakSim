@@ -97,7 +97,7 @@ class Spectrum:
 
 class Plot(Spectrum):
     def __init__(self,
-                 npts=1e5,
+                 npts=5e2,
                  ppm_min=0,
                  ppm_max=10,
                  intensity_min=0,
@@ -113,45 +113,48 @@ class Plot(Spectrum):
         self.intensity_max = intensity_max
         self.kwargs = kwargs
 
-        self.ppm = np.linspace(ppm_min, ppm_max, int(npts))
+        #self.ppm = np.linspace(ppm_min, ppm_max, int(npts))
 
-    def plot(self, peak_int=None, curve="lorentzian", fwhm=0.004, internal=True, bound=False):
+    def plot_peak(self, peak_int=0, curve="lorentzian", fwhm=0.004, internal=False):
         """
         Parameters:
         curve: str
         "lorentzian", "gaussian", "vline"
         fwhm: float
         """
+        """
+        TODO:
+        Change this function to plot only one peak
+        Then make another function to plot all the peaks for the spectrum. 
+        Each peak will have its own number of points ideally calculated based on spect freq and req spacing per Hertz. 
+        That way, changing the FWHM captures most of the peak boundary but is guaranteed to capture multiplicity
+        for a small enough FWHM.
+        """
+        inten, subshifts = self.peaks[peak_int].get_subpeaks()
+        ppm_points = np.linspace(subshifts[0]+3*fwhm, subshifts[-1]-3*fwhm, int(self.npts))
 
-        self.plotted_peaks = []
-        if curve == "gaussian":
-            for peak in self.peaks:
-                inten, subshifts = peak.get_subpeaks()
-                pk = np.sum(np.array([gaussian(self.ppm, subshifts[i], inten[i], fwhm)
-                                     for i in range(len(inten))]), axis=0)
-                self.plotted_peaks.append(pk/np.sum(pk)*peak.integration)
+        if curve in ['gaussian', 'lorentzian']:
+            pk = np.sum(np.array([eval(curve)(ppm_points, subshifts[i], inten[i], fwhm)
+                                 for i in range(len(inten))]), axis=0)
+            peak = pk/np.sum(pk)*self.peaks[peak_int].integration
 
-        elif curve == "vline":
-            pass
-
-        else:  # lorenzian default
-            for peak in self.peaks:
-                inten, subshifts = peak.get_subpeaks()
-                pk = np.sum(np.array([lorentzian(self.ppm, subshifts[i], inten[i], fwhm)
-                                      for i in range(len(inten))]), axis=0)
-                self.plotted_peaks.append(pk/np.sum(pk)*peak.integration)
+        else:
+            raise ValueError('Please pass the correct lineshape using the curve parameter.')
 
         if internal:
-            for i, peak in enumerate(self.plotted_peaks):
-                plt.plot(self.ppm, peak / np.sum(peak) * self.peaks[i].integration, **self.kwargs)
+            plt.plot(ppm_points, peak / np.sum(peak) * self.peaks[peak_int].integration, **self.kwargs)
             plt.show()
         else:
-            if isinstance(peak_int, int):
-                sp = self.peaks[peak_int].get_subpeaks()[1]
-                bounds = np.logical_and(sp[0]+4*fwhm > self.ppm, self.ppm > sp[-1]-4*fwhm)
-                return self.ppm[bounds], self.plotted_peaks[peak_int][bounds]
-            else:
-                return self.ppm, np.sum(self.plotted_peaks, axis=0)
+            return ppm_points, peak
+
+    def plot_all(self, **kwargs): # same parameters as plot_peak except peak_int
+        peaks_to_plot = (self.plot_peak(peak_int=i, **kwargs) for i in range(len(self.peaks)))
+        if 'internal' in kwargs.keys() and internal:
+            for peak in peaks_to_plot:
+                plt.plot(*peak, **self.kwargs)
+                plt.show()
+        else:
+            return peaks_to_plot
 
     def custom_options(self, methods: list):
         for m in methods: m
