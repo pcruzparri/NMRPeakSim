@@ -7,6 +7,7 @@ import numpy as np
 
 dpg.create_context()
 dpg.create_viewport(title='NMRPeakSim')
+dpg.set_viewport_resize_callback(cb.viewport_resize_callback)
 vpw = dpg.get_viewport_client_width()
 vph = dpg.get_viewport_client_height()
 spect_gui = {"width": -1,
@@ -18,14 +19,17 @@ peak_gui = {"width": vpw*4//5,
 options_gui = {"width": -1,
                "height": vph//2,
                "pos": (vpw*4//5, 0)}
-message_gui = {"width": vpw*1//3-40,
-               "height": vph*1//3,
+message_gui = {"width": vpw//3-40,
+               "height": vph//3,
                "pos": (vpw*2//3+20, vph*2//3+20)}
 
+class RunData:
+    def __init__(self):
+        self.spectrum = core.Plot()
+        self.peaks = []
+        self.selected_peak = 0
 
-spectrum = core.Plot()
-peaks = []
-selected_peak = 0
+data = RunData()
 
 with dpg.window(tag='main_window'):
     # Plotting Spectrum
@@ -61,27 +65,56 @@ with dpg.window(tag='main_window'):
                           height=options_gui['height'],
                           pos=options_gui['pos'],
                           autosize_x=True,
+                          horizontal_scrollbar=True,
                           tag='tools_window'):
         with dpg.tab_bar(label='Tools'):
 
+            with dpg.tab(label='Plot',
+                         tag='plot_tab'):
+                with dpg.group(tag='spectrum_plot_opts'):
+                    dpg.add_input_int(label='Number of peak points',
+                                      tag='npts',
+                                      default_value=data.spectrum.npts,
+                                      step_fast=1000,
+                                      step=100,
+                                      user_data=data,
+                                      callback=cb.spect_plot_params,
+                                      width=150)
+                    dpg.add_input_floatx(label='Min/Max ppm',
+                                         tag='spect_ppm_range',
+                                         default_value=(data.spectrum.ppm_min, data.spectrum.ppm_max),
+                                         size=2,
+                                         user_data=data,
+                                         callback=cb.spect_plot_params,
+                                         width=150)
+                    dpg.add_input_floatx(label='Min/Max intensity',
+                                         tag='spect_int_range',
+                                         size=2,
+                                         default_value=(data.spectrum.intensity_min, data.spectrum.intensity_max),
+                                         user_data=data,
+                                         callback=cb.spect_plot_params,
+                                         width=150)
+            # Spectrum Tab
+            '''with dpg.tab(label='Spectrum',
+                         tag='spectrum_tab',
+                         before='plot_tab'):
+                pass'''
+
             # Peak Tab
-            with dpg.tab(label='Peak'):
-                dpg.add_combo(label='peak',
-                              tag='peak_select',
-                              user_data=(spectrum, peaks, selected_peak),
-                              callback=cb.psu_wrapper,
-                              width=200)
+            with dpg.tab(label='Peak',
+                         tag='peak_tab',
+                         before='plot_tab'):
                 with dpg.group(tag='peak_creation'):
                     dpg.add_input_float(label="Shift (ppm)",
-                                        default_value=5,
+                                        default_value=0.5,
                                         tag='center_shift',
                                         width=150)
                     dpg.add_input_float(label="Integration",
-                                      tag='integration',
-                                      default_value=1,
-                                      min_value=0,
-                                      step=1,
-                                      width=150)
+                                        tag='integration',
+                                        default_value=1,
+                                        min_value=0,
+                                        step=1,
+                                        width=150)
                     dpg.add_input_int(label='Spectrometer Frequency (MHz)',
                                       default_value=300,
                                       step=10,
@@ -91,8 +124,20 @@ with dpg.window(tag='main_window'):
                     dpg.add_button(label="Create Peak",
                                    width=150,
                                    tag='add_peak',
-                                   user_data=(spectrum, peaks, selected_peak),
+                                   user_data=data,
                                    callback=cb.peak_creation_callback)
+                dpg.add_button(label="Remove Peak",
+                                   width=150,
+                                   tag='remove_peak',
+                                   user_data=data,
+                                   callback=cb.peak_remove_callback)
+                dpg.add_spacer(height=20)
+
+                dpg.add_combo(label='Selected Peak',
+                              tag='peak_select',
+                              user_data=data,
+                              callback=cb.peak_select_update,
+                              width=150)
                 dpg.add_spacer(height=20)
 
                 with dpg.group(tag='peak_splitting'):
@@ -106,12 +151,12 @@ with dpg.window(tag='main_window'):
                                       tag='J')
                     dpg.add_button(label="Split Peak",
                                    width=150,
-                                   user_data=(spectrum, peaks, selected_peak),
+                                   user_data=data,
                                    tag='split_peak',
                                    callback=cb.peak_modify_callback)
                     dpg.add_button(label='Undo Split',
                                    width=150,
-                                   user_data=(spectrum, peaks, selected_peak),
+                                   user_data=data,
                                    tag='undo_split',
                                    callback=cb.peak_modify_callback)
                 dpg.add_spacer(height=20)
@@ -122,14 +167,12 @@ with dpg.window(tag='main_window'):
                                         tag='delta')
                     dpg.add_button(label='Shift Center',
                                    width=150,
-                                   user_data=(spectrum, peaks, selected_peak),
+                                   user_data=data,
                                    tag='shift_center',
                                    callback=cb.peak_modify_callback)
                 dpg.add_spacer(height=20)
 
-            dpg.add_tab(label='Spectrum')
-            with dpg.tab(label='Plot'):
-                pass
+
 
 
 dpg.set_primary_window('main_window', True)
@@ -137,7 +180,6 @@ dpg.setup_dearpygui()
 dpg.show_viewport()
 
 while dpg.is_dearpygui_running():
-    #cb.peak_select_update(spectrum, peaks, selected_peak)
     dpg.render_dearpygui_frame()
 
 dpg.destroy_context()

@@ -57,16 +57,16 @@ class Peak:
     def __repr__(self):
         if self.splittings == ['s']:
             return str(self.integration)+'H'\
-                   +', '+str(self.center_shift) + ' ppm' \
-                   +', '+''.join(self.splittings)
+                   + ', ' + "%0.2f"%self.center_shift + ' ppm' \
+                   + ', ' + ''.join(self.splittings)
         else:
             splits = sorted(zip(self.splittings[1:], [str(i) for i in self.couplings[1:]]),
                             key=lambda x: x[1], reverse=True)
 
             return str(self.integration)+'H'\
-                   +', '+str(self.center_shift) + ' ppm' \
-                   +', '+''.join([r[0] for r in splits])\
-                   +', J = '+ ', '.join([r[1] for r in splits])+' Hz'
+                   + ', ' + "%0.2f"%self.center_shift + ' ppm' \
+                   + ', ' + ''.join([r[0] for r in splits])\
+                   + ', J = ' + ', '.join([r[1] for r in splits])+' Hz'
 
 
 class Spectrum:
@@ -78,7 +78,6 @@ class Spectrum:
             self.peaks.append(kwargs['peak'])
         else:
             self.peaks.append(Peak(**kwargs))
-        print("ADDED PEAK")
         return self
 
     def modify(self, ind, method, **kwargs):
@@ -91,7 +90,7 @@ class Spectrum:
     def remove_peak(self, ind):
         # len(self.peaks)>ind>=0
         assert 0 <= ind < len(self.peaks), f"Index {ind} is out of the range [0, {len(self.peaks)})."
-        self.peaks = self.peaks[:ind] + self.peaks[ind + 1:]
+        del self.peaks[ind]
         return self
 
 
@@ -101,7 +100,7 @@ class Plot(Spectrum):
                  ppm_min=0,
                  ppm_max=10,
                  intensity_min=0,
-                 intensity_max=None,
+                 intensity_max=200,
                  **kwargs):  # pyplot.plot kwargs
         import matplotlib.pyplot as plt
 
@@ -136,13 +135,14 @@ class Plot(Spectrum):
         if curve in ['gaussian', 'lorentzian']:
             pk = np.sum(np.array([eval(curve)(ppm_points, subshifts[i], inten[i], fwhm)
                                  for i in range(len(inten))]), axis=0)
-            peak = pk/np.sum(pk)*self.peaks[peak_int].integration
+            peak = pk*self.peaks[peak_int].integration/np.sum(pk)/np.subtract(*ppm_points[[0, -1]])
 
         else:
             raise ValueError('Please pass the correct lineshape using the curve parameter.')
 
         if internal:
-            plt.plot(ppm_points, peak / np.sum(peak) * self.peaks[peak_int].integration, **self.kwargs)
+            plt.plot(ppm_points, peak*self.peaks[peak_int].integration/np.sum(pk)/np.subtract(*ppm_points[[0, -1]]),
+                     **self.kwargs)
             plt.show()
         else:
             return ppm_points, peak
