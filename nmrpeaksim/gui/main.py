@@ -10,18 +10,6 @@ dpg.create_viewport(title='NMRPeakSim')
 dpg.set_viewport_resize_callback(cb.viewport_resize_callback)
 vpw = dpg.get_viewport_client_width()
 vph = dpg.get_viewport_client_height()
-spect_gui = {"width": -1,
-             "height": -1,
-             "pos": (0, vph//2)}
-peak_gui = {"width": vpw*4//5,
-            "height": vph//2,
-            "pos": (0, 0)}
-options_gui = {"width": -1,
-               "height": vph//2,
-               "pos": (vpw*4//5, 0)}
-message_gui = {"width": vpw//3-40,
-               "height": vph//3,
-               "pos": (vpw*2//3+20, vph*2//3+20)}
 
 class RunData:
     def __init__(self):
@@ -33,9 +21,8 @@ data = RunData()
 
 with dpg.window(tag='main_window'):
     # Plotting Spectrum
-    with dpg.child_window(pos=spect_gui['pos'],
-                          width=spect_gui['width'],
-                          height=spect_gui['height'],
+    with dpg.child_window(width=-1,
+                          height=-1,
                           tag='plot_window'):
         with dpg.plot(label='Spectrum View',
                       width=-1,
@@ -47,9 +34,7 @@ with dpg.window(tag='main_window'):
             dpg.add_plot_legend()
 
     # Plotting Peak
-    with dpg.child_window(pos=peak_gui['pos'],
-                          width=peak_gui['width'],
-                          height=peak_gui['height'],
+    with dpg.child_window(pos=(0, 0),
                           tag='peak_window'):
         with dpg.plot(label='Peak View',
                       width=-1,
@@ -61,9 +46,7 @@ with dpg.window(tag='main_window'):
 
     # Tools
     with dpg.child_window(label="Tools",
-                          width=options_gui['width'],
-                          height=options_gui['height'],
-                          pos=options_gui['pos'],
+                          width=-1,
                           autosize_x=True,
                           horizontal_scrollbar=True,
                           tag='tools_window'):

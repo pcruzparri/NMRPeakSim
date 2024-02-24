@@ -145,9 +145,8 @@ def spect_plot_params(sender, app_data, user_data):
         pass
 
 def viewport_resize_callback(sender, app_data):
-    print(sender, app_data)
     vpw = app_data[2]
     vph = app_data[3]
-    dpg.configure_item('peak_window', width=vpw*4//5, height=vph//2)
-    dpg.configure_item('tools_window', pos=(vpw*4//5, 0), height=vph//2)
+    dpg.configure_item('peak_window', width=vpw*3.5//5, height=vph//2)
+    dpg.configure_item('tools_window', pos=(vpw*3.5//5, 0), height=vph//2)
     dpg.configure_item('plot_window', pos=(0, vph//2))
