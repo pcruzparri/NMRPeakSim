@@ -1,4 +1,5 @@
 from nmrpeaksim.core.core import *
+from nmrpeaksim.core.utils import *
 import dearpygui.dearpygui as dpg
 
 
@@ -19,7 +20,6 @@ def peak_remove_callback(sender, app_data, user_data):
 
 
 def peak_modify_callback(sender, app_data, user_data):
-    print(peak_select_update(sender, app_data, user_data))
     ind = peak_select_update(sender, app_data, user_data)[0]
     if sender == 'undo_split':
         getattr(user_data.spectrum, 'modify')(ind, sender)
@@ -73,7 +73,6 @@ def peak_select_update(sender, app_data, user_data):
     else:
         peak_labels = [f'{ind}: {repr(pk)}' for ind, pk in enumerate(user_data.spectrum.peaks)]
         selected = dpg.get_value('peak_select')
-        print(peak_labels, selected)
 
         # update the peak labels
         if user_data.peaks != peak_labels:
@@ -106,7 +105,8 @@ def peak_select_update(sender, app_data, user_data):
 
         update_peak_plot(user_data.spectrum, ind=user_data.selected_peak, label=peak_labels[user_data.selected_peak])
         update_spectrum_plot(user_data.spectrum)
-    print(user_data.peaks, user_data.selected_peak)
+
+    peak_info_update(user_data)
     return user_data.selected_peak, user_data.peaks[user_data.selected_peak]
 
 
@@ -147,6 +147,73 @@ def spect_plot_params(sender, app_data, user_data):
 def viewport_resize_callback(sender, app_data):
     vpw = app_data[2]
     vph = app_data[3]
-    dpg.configure_item('peak_window', width=vpw*3.5//5, height=vph//2)
-    dpg.configure_item('tools_window', pos=(vpw*3.5//5, 0), height=vph//2)
+    dpg.configure_item('peak_window', width=vpw*3//5, height=vph//2, pos=(0, 0))
+    dpg.configure_item('tools_window', pos=(vpw*4//5, 0), height=vph//2)
     dpg.configure_item('plot_window', pos=(0, vph//2))
+    dpg.configure_item('peak_info_window', width=vpw/5, height=vph/2, pos=(vpw*3//5, 0))
+    dpg.configure_item('pwi_top', width=vpw//5, height=vph//4, pos=(0, 0))
+    dpg.configure_item('pwi_bottom', width=vpw//5, height=vph//4, pos=(0, vph//2/2))
+
+
+def peak_info_update(user_data):
+    dpg.delete_item('pwi_top', children_only=True)
+    dpg.delete_item('pwi_bottom', children_only=True)
+    dpg.add_button(label='Splitting Pattern Controls',
+                   tag='pwi_top_title',
+                   parent='pwi_top',
+                   width=-1,
+                   enabled=False)
+    dpg.add_spacer(height=5, parent='pwi_top')
+    dpg.add_button(label='Coupling Controls',
+                   tag='pwi_bottom_title',
+                   parent='pwi_bottom',
+                   width=-1,
+                   enabled=False)
+    dpg.add_spacer(height=5, parent='pwi_bottom')
+
+    with dpg.theme() as title_button_theme:
+        with dpg.theme_component(dpg.mvButton, enabled_state=False):
+            dpg.add_theme_color(dpg.mvThemeCol_Button, dpg.get_viewport_clear_color())
+            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, dpg.get_viewport_clear_color())
+    dpg.bind_item_theme('pwi_top_title', title_button_theme)
+    dpg.bind_item_theme('pwi_bottom_title', title_button_theme)
+
+    peak = user_data.spectrum.peaks[user_data.selected_peak]
+    if len(peak.splittings) > 1:
+        for ind, split in enumerate(peak.splittings[1:]):
+            mult_default = list(mult_map.keys())[list(mult_map.values()).index(split)]
+            dpg.add_slider_int(label=f'J{ind+1}: {split}',
+                               tag=f'split{ind+1},{split}',
+                               default_value=mult_default,
+                               min_value=1,
+                               max_value=9,
+                               parent='pwi_top',
+                               width=150,
+                               user_data=user_data,
+                               callback=update_splitting_callback)
+            dpg.add_slider_int(label=f'J{ind+1}: {split}',
+                               tag=f'coupling{ind+1},{split}',
+                               default_value=peak.couplings[ind+1],
+                               max_value=50,
+                               parent='pwi_bottom',
+                               width=150,
+                               user_data=user_data,
+                               callback=update_coupling_callback)
+
+
+def update_coupling_callback(sender, app_data, user_data):
+    peak = user_data.spectrum.peaks[user_data.selected_peak]
+    ind, mult = sender.strip('coupling').split(',')
+
+    mult = list(mult_map.keys())[list(mult_map.values()).index(mult)]
+    peak.change_splitting(ind=int(ind), mult=mult, J=app_data)
+    update_peak_plot(user_data.spectrum, user_data.selected_peak, user_data.peaks[user_data.selected_peak])
+    update_spectrum_plot(user_data.spectrum)
+
+def update_splitting_callback(sender, app_data, user_data):
+    peak = user_data.spectrum.peaks[user_data.selected_peak]
+    ind = sender.strip('split').split(',')[0]
+    J = dpg.get_value('coupling'+sender.strip('split'))
+    peak.change_splitting(ind=int(ind), mult=app_data, J=J)
+    update_peak_plot(user_data.spectrum, user_data.selected_peak, user_data.peaks[user_data.selected_peak])
+    update_spectrum_plot(user_data.spectrum)

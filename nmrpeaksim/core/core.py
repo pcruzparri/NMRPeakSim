@@ -23,19 +23,12 @@ class Peak:
     def split_peak(self, mult=2, J=7):
         # J=J/ref
         self.intensities.append([prev * new for prev in self.intensities[-1] for new in Pascals_triangle(mult)])
-        # print(self.subpeak_shifts, self.subpeak_shifts[-1])
-        # if mult%2==0:
         self.subpeak_shifts.append([(prev * self.field + J * (mult - 1) / 2 - subpeak * J) / self.field
                                     for prev in self.subpeak_shifts[-1]
                                     for subpeak in range(mult)])
         self.splittings.append(mult_map[mult])
         self.couplings.append(J)
 
-        """else:
-            self.subpeak_shifts.append([(prev*ref + J*(mult-1)/2 - subpeak*J)/ref
-                                     for prev in self.subpeak_shifts[-1]
-                                    for subpeak in range(mult)])"""
-        #print(self.subpeak_shifts[-1])
         return self
 
     def undo_split(self):
@@ -44,6 +37,27 @@ class Peak:
         self.splittings.pop()
         self.couplings.pop()
         return self
+
+    def change_splitting(self, ind=1, mult=2, J=7):
+        assert ind>0
+        if ind == len(self.splittings)-1:
+            self.undo_split()
+            self.split_peak(mult=mult, J=J)
+        else:
+            intensities_kept = [len(i)-1 for i in self.intensities[ind+1:]]
+            couplings_kept = self.couplings[ind+1:]
+
+            self.intensities = self.intensities[:ind]
+            self.subpeak_shifts = self.subpeak_shifts[:ind]
+            self.splittings = self.splittings[:ind]
+            self.couplings = self.couplings[:ind]
+
+            self.split_peak(mult=mult, J=J)
+            for i in range(len(intensities_kept)):
+                self.split_peak(mult=intensities_kept[i], J=couplings_kept[i])
+        return self
+
+
 
     def shift_center(self, delta=0):
         self.center_shift += delta

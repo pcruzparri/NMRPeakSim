@@ -8,8 +8,6 @@ import numpy as np
 dpg.create_context()
 dpg.create_viewport(title='NMRPeakSim')
 dpg.set_viewport_resize_callback(cb.viewport_resize_callback)
-vpw = dpg.get_viewport_client_width()
-vph = dpg.get_viewport_client_height()
 
 class RunData:
     def __init__(self):
@@ -34,8 +32,7 @@ with dpg.window(tag='main_window'):
             dpg.add_plot_legend()
 
     # Plotting Peak
-    with dpg.child_window(pos=(0, 0),
-                          tag='peak_window'):
+    with dpg.child_window(tag='peak_window'):
         with dpg.plot(label='Peak View',
                       width=-1,
                       height=-1,
@@ -43,6 +40,12 @@ with dpg.window(tag='main_window'):
             dpg.add_plot_axis(dpg.mvXAxis, label='ppm', tag='peak_x_axis', invert=True)
             dpg.add_plot_axis(dpg.mvYAxis, label='Intensity', tag='peak_y_axis')
             dpg.add_line_series([], [], parent='peak_y_axis', tag='view_peak_line')
+
+    # Plotting Peak Info
+    with dpg.child_window(tag='peak_info_window',
+                          no_scrollbar=True):
+        dpg.add_child_window(tag='pwi_top')
+        dpg.add_child_window(tag='pwi_bottom')
 
     # Tools
     with dpg.child_window(label="Tools",
@@ -110,7 +113,7 @@ with dpg.window(tag='main_window'):
                                    user_data=data,
                                    callback=cb.peak_creation_callback)
                 dpg.add_button(label="Remove Peak",
-                                   width=150,
+                                  width=150,
                                    tag='remove_peak',
                                    user_data=data,
                                    callback=cb.peak_remove_callback)
