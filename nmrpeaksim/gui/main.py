@@ -80,11 +80,6 @@ with dpg.window(tag='main_window'):
                                          user_data=data,
                                          callback=cb.spect_plot_params,
                                          width=150)
-            # Spectrum Tab
-            '''with dpg.tab(label='Spectrum',
-                         tag='spectrum_tab',
-                         before='plot_tab'):
-                pass'''
 
             # Peak Tab
             with dpg.tab(label='Peak',

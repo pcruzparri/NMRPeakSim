@@ -82,8 +82,8 @@ def peak_select_update(sender, app_data, user_data):
         if not peak_labels:
             user_data.selected_peak = None
             dpg.set_value('peak_select', '')
-            update_peak_plot(user_data.spectrum, ind=user_data.selected_peak)
             update_spectrum_plot(user_data.spectrum)
+            update_peak_plot(user_data.spectrum, ind=user_data.selected_peak)
             return
 
         elif selected and selected not in peak_labels:
@@ -103,8 +103,8 @@ def peak_select_update(sender, app_data, user_data):
                 user_data.selected_peak = 0
                 dpg.set_value('peak_select', user_data.peaks[user_data.selected_peak])
 
-        update_peak_plot(user_data.spectrum, ind=user_data.selected_peak, label=peak_labels[user_data.selected_peak])
         update_spectrum_plot(user_data.spectrum)
+        update_peak_plot(user_data.spectrum, ind=user_data.selected_peak, label=peak_labels[user_data.selected_peak])
 
     peak_info_update(user_data)
     return user_data.selected_peak, user_data.peaks[user_data.selected_peak]
@@ -125,10 +125,13 @@ def update_peak_plot(spectrum, ind=0, label=''):
 
 
 def update_spectrum_plot(spectrum):
-    dpg.delete_item('spect_y_axis', children_only=True)
     peaks = spectrum.plot_all()
     for ind, peak in enumerate(peaks):
-        dpg.add_line_series(*peak, parent='spect_y_axis', label=f'{ind}: {repr(spectrum.peaks[ind])}')
+        if not dpg.does_item_exist(f'spect_line_{ind}'):
+            dpg.add_line_series(*peak, parent='spect_y_axis', label=f'{ind}: {repr(spectrum.peaks[ind])}',
+                                tag=f'spect_line_{ind}')
+        else:
+            dpg.set_value(f'spect_line_{ind}', peak)
     dpg.fit_axis_data('spect_y_axis')
 
 
@@ -139,10 +142,12 @@ def spect_plot_params(sender, app_data, user_data):
         update_peak_plot(user_data.spectrum,
                          user_data.selected_peak,
                          user_data.peaks[user_data.selected_peak])
+    elif sender == 'spect_ppm_range':
+        print(app_data)
+        dpg.set_axis_limits('spect_x_axis', *app_data[:2])
     elif sender == 'spect_int_range':
-        pass
-    elif sender == 'spect_int_range':
-        pass
+        print(app_data)
+        dpg.set_axis_limits('spect_y_axis', *app_data[:2])
 
 def viewport_resize_callback(sender, app_data):
     vpw = app_data[2]
@@ -182,7 +187,7 @@ def peak_info_update(user_data):
     if len(peak.splittings) > 1:
         for ind, split in enumerate(peak.splittings[1:]):
             mult_default = list(mult_map.keys())[list(mult_map.values()).index(split)]
-            dpg.add_slider_int(label=f'J{ind+1}: {split}',
+            dpg.add_slider_int(label=f'J{ind+1},{split}',
                                tag=f'split{ind+1},{split}',
                                default_value=mult_default,
                                min_value=1,
@@ -191,7 +196,7 @@ def peak_info_update(user_data):
                                width=150,
                                user_data=user_data,
                                callback=update_splitting_callback)
-            dpg.add_slider_int(label=f'J{ind+1}: {split}',
+            dpg.add_slider_int(label=f'J{ind+1},{split}',
                                tag=f'coupling{ind+1},{split}',
                                default_value=peak.couplings[ind+1],
                                max_value=50,
@@ -207,13 +212,17 @@ def update_coupling_callback(sender, app_data, user_data):
 
     mult = list(mult_map.keys())[list(mult_map.values()).index(mult)]
     peak.change_splitting(ind=int(ind), mult=mult, J=app_data)
+
     update_peak_plot(user_data.spectrum, user_data.selected_peak, user_data.peaks[user_data.selected_peak])
     update_spectrum_plot(user_data.spectrum)
 
 def update_splitting_callback(sender, app_data, user_data):
     peak = user_data.spectrum.peaks[user_data.selected_peak]
-    ind = sender.strip('split').split(',')[0]
+    ind, mult = sender.strip('split').split(',')
     J = dpg.get_value('coupling'+sender.strip('split'))
     peak.change_splitting(ind=int(ind), mult=app_data, J=J)
+
+    dpg.set_item_label(sender, f'J{ind},{mult_map[app_data]}')
+    dpg.set_item_label('coupling'+sender.strip('split'), f'J{ind},{mult_map[app_data]}')
     update_peak_plot(user_data.spectrum, user_data.selected_peak, user_data.peaks[user_data.selected_peak])
     update_spectrum_plot(user_data.spectrum)
