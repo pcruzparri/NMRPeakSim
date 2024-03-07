@@ -2,7 +2,8 @@ __all__ = ["Pascals_triangle",
            "gaussian",
            "lorentzian",
            "vline",
-           "mult_map"]
+           "mult_map",
+           "get_key"]
 
 import numpy as np
 
@@ -40,3 +41,8 @@ mult_map = {
     8: 'oct',
     9: 'non'
 }
+
+def get_key(dct, val):
+    # Assumes k,v pair is unique in dct
+    return list(dct.keys())[list(dct.values()).index(val)]
+

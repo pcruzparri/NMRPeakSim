@@ -1,6 +1,6 @@
-from nmrpeaksim.core.core import *
 from nmrpeaksim.core.utils import *
 import dearpygui.dearpygui as dpg
+from icecream import ic
 
 
 def spect_gui_resize_callback():
@@ -16,6 +16,11 @@ def peak_creation_callback(sender, app_data, user_data):
 
 def peak_remove_callback(sender, app_data, user_data):
     getattr(user_data.spectrum, sender)(user_data.selected_peak)
+    dpg.delete_item(f'spect_line_{user_data.selected_peak}')
+    for line in dpg.get_item_children('spect_y_axis', 1):
+        line_ind = int(dpg.get_item_alias(line).strip('spect_line_'))
+        if line_ind > user_data.selected_peak:
+            dpg.set_item_alias(line, f'spect_line_{line_ind-1}')
     peak_select_update(sender, app_data, user_data)
 
 
@@ -38,29 +43,11 @@ def spectrum_callback(sender, app_data, user_data):
 def plot_callback(sender, app_data, user_data):
     pass
 
-'''
-def peak_callback_wrapper(sender, _, user_data):
-    if sender == 'create_peak':
-        spectrum, method = user_data[:2]
-        kwargs = {key: dpg.get_value(key) for key in user_data[2:]}
-        getattr(spectrum, method)(**kwargs)
-    else:
-        spectrum, mod, ind, method = user_data[0:4]
-        kwargs = {key: dpg.get_value(key) for key in user_data[4:]}
-        getattr(spectrum, mod)(ind, method, **kwargs)
-    dpg.set_value('spectrum_line', spectrum.plot(internal=False))
-    dpg.set_value('peak_line', spectrum.plot(internal=False))
-    print(spectrum.peaks)'''
-
 
 def plot_callback_wrapper(sender, app_data, user_data):
     pass
 
 
-"""def psu_wrapper(sender, app_data, user_data):
-    peak_select_update(user_data)
-
-"""
 def peak_select_update(sender, app_data, user_data):
     if sender == 'peak_select':
         if not app_data:
@@ -68,6 +55,7 @@ def peak_select_update(sender, app_data, user_data):
         else:
             user_data.selected_peak = int(app_data.split(':')[0])
         update_peak_plot(user_data.spectrum, ind=user_data.selected_peak, label=user_data.peaks[user_data.selected_peak])
+
 
     # Cases for creating, deleting, and modifying the peaks
     else:
@@ -79,13 +67,20 @@ def peak_select_update(sender, app_data, user_data):
             dpg.configure_item('peak_select', items=peak_labels)
             user_data.peaks = peak_labels
 
-        if not peak_labels:
+        # set selector to the last peak created
+        if sender == 'add_peak':
+            user_data.selected_peak = len(peak_labels)-1
+            dpg.set_value('peak_select', peak_labels[-1])
+
+        # handle when every peak is removed
+        elif not peak_labels:
             user_data.selected_peak = None
             dpg.set_value('peak_select', '')
             update_spectrum_plot(user_data.spectrum)
             update_peak_plot(user_data.spectrum, ind=user_data.selected_peak)
             return
 
+        # handle when an item is selected but it's label is no longer present or accurate
         elif selected and selected not in peak_labels:
             ind = int(selected.split(':')[0])
             if ind < len(peak_labels):
@@ -143,11 +138,18 @@ def spect_plot_params(sender, app_data, user_data):
                          user_data.selected_peak,
                          user_data.peaks[user_data.selected_peak])
     elif sender == 'spect_ppm_range':
-        print(app_data)
         dpg.set_axis_limits('spect_x_axis', *app_data[:2])
     elif sender == 'spect_int_range':
-        print(app_data)
         dpg.set_axis_limits('spect_y_axis', *app_data[:2])
+    elif sender == 'fwhm':
+        user_data.spectrum.fwhm = app_data
+        update_spectrum_plot(user_data.spectrum)
+        update_peak_plot(user_data.spectrum, ind=user_data.selected_peak, label=user_data.peaks[user_data.selected_peak])
+    elif sender == 'fit_zoom':
+        dpg.set_axis_limits_auto('spect_x_axis')
+        dpg.set_axis_limits_auto('spect_y_axis')
+        dpg.fit_axis_data('spect_x_axis')
+        dpg.fit_axis_data('spect_y_axis')
 
 def viewport_resize_callback(sender, app_data):
     vpw = app_data[2]
@@ -161,68 +163,61 @@ def viewport_resize_callback(sender, app_data):
 
 
 def peak_info_update(user_data):
-    dpg.delete_item('pwi_top', children_only=True)
-    dpg.delete_item('pwi_bottom', children_only=True)
-    dpg.add_button(label='Splitting Pattern Controls',
-                   tag='pwi_top_title',
-                   parent='pwi_top',
-                   width=-1,
-                   enabled=False)
-    dpg.add_spacer(height=5, parent='pwi_top')
-    dpg.add_button(label='Coupling Controls',
-                   tag='pwi_bottom_title',
-                   parent='pwi_bottom',
-                   width=-1,
-                   enabled=False)
-    dpg.add_spacer(height=5, parent='pwi_bottom')
-
-    with dpg.theme() as title_button_theme:
-        with dpg.theme_component(dpg.mvButton, enabled_state=False):
-            dpg.add_theme_color(dpg.mvThemeCol_Button, dpg.get_viewport_clear_color())
-            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, dpg.get_viewport_clear_color())
-    dpg.bind_item_theme('pwi_top_title', title_button_theme)
-    dpg.bind_item_theme('pwi_bottom_title', title_button_theme)
-
     peak = user_data.spectrum.peaks[user_data.selected_peak]
     if len(peak.splittings) > 1:
         for ind, split in enumerate(peak.splittings[1:]):
-            mult_default = list(mult_map.keys())[list(mult_map.values()).index(split)]
-            dpg.add_slider_int(label=f'J{ind+1},{split}',
-                               tag=f'split{ind+1},{split}',
-                               default_value=mult_default,
-                               min_value=1,
-                               max_value=9,
-                               parent='pwi_top',
-                               width=150,
-                               user_data=user_data,
-                               callback=update_splitting_callback)
-            dpg.add_slider_int(label=f'J{ind+1},{split}',
-                               tag=f'coupling{ind+1},{split}',
-                               default_value=peak.couplings[ind+1],
-                               max_value=50,
-                               parent='pwi_bottom',
-                               width=150,
-                               user_data=user_data,
-                               callback=update_coupling_callback)
+            mult_default = get_key(mult_map, split)
+            if not dpg.does_item_exist(f'split{ind+1}'):
+                dpg.add_slider_int(label=f'J{ind+1},{split}',
+                                   tag=f'split{ind+1}',
+                                   default_value=mult_default,
+                                   min_value=1,
+                                   max_value=9,
+                                   parent='pwi_top',
+                                   width=150,
+                                   user_data=user_data,
+                                   callback=update_splitting_callback)
+                dpg.add_slider_int(label=f'J{ind+1}',
+                                   tag=f'coupling{ind+1}',
+                                   default_value=peak.couplings[ind+1],
+                                   max_value=50,
+                                   parent='pwi_bottom',
+                                   width=150,
+                                   user_data=user_data,
+                                   callback=update_coupling_callback)
+            elif not dpg.is_item_shown(f'split{ind+1}'):
+                dpg.show_item(f'split{ind+1}')
+                dpg.show_item(f'coupling{ind+1}')
+                dpg.set_value(f'split{ind+1}', mult_default)
+                dpg.set_value(f'coupling{ind+1}', peak.couplings[ind+1])
+    diff = len(peak.splittings[1:]) - len(dpg.get_item_children('pwi_top', 1)[2:])
+    if diff < 0:
+        for child in dpg.get_item_children('pwi_top', 1)[2:][diff:]:
+            dpg.hide_item(child)
+            dpg.hide_item('coupling'+dpg.get_item_alias(child).lstrip('split'))
+
 
 
 def update_coupling_callback(sender, app_data, user_data):
     peak = user_data.spectrum.peaks[user_data.selected_peak]
-    ind, mult = sender.strip('coupling').split(',')
-
-    mult = list(mult_map.keys())[list(mult_map.values()).index(mult)]
+    ind = sender.lstrip('coupling')
+    mult = dpg.get_value('split'+sender.lstrip('coupling'))
     peak.change_splitting(ind=int(ind), mult=mult, J=app_data)
 
     update_peak_plot(user_data.spectrum, user_data.selected_peak, user_data.peaks[user_data.selected_peak])
     update_spectrum_plot(user_data.spectrum)
+    peak_select_update(sender, None, user_data)
+
 
 def update_splitting_callback(sender, app_data, user_data):
     peak = user_data.spectrum.peaks[user_data.selected_peak]
-    ind, mult = sender.strip('split').split(',')
-    J = dpg.get_value('coupling'+sender.strip('split'))
+    ind = sender.lstrip('split')
+    J = dpg.get_value('coupling'+sender.lstrip('split'))
     peak.change_splitting(ind=int(ind), mult=app_data, J=J)
 
     dpg.set_item_label(sender, f'J{ind},{mult_map[app_data]}')
-    dpg.set_item_label('coupling'+sender.strip('split'), f'J{ind},{mult_map[app_data]}')
+    dpg.set_item_label('coupling'+sender.lstrip('split'), f'J{ind},{mult_map[app_data]}')
+
     update_peak_plot(user_data.spectrum, user_data.selected_peak, user_data.peaks[user_data.selected_peak])
     update_spectrum_plot(user_data.spectrum)
+    peak_select_update(sender, None, user_data)

@@ -46,6 +46,27 @@ with dpg.window(tag='main_window'):
                           no_scrollbar=True):
         dpg.add_child_window(tag='pwi_top')
         dpg.add_child_window(tag='pwi_bottom')
+        dpg.add_button(label='Splitting Pattern Controls',
+                   tag='pwi_top_title',
+                   parent='pwi_top',
+                   width=-1,
+                   enabled=False)
+        dpg.add_spacer(height=5, parent='pwi_top')
+        dpg.add_button(label='Coupling Controls',
+                       tag='pwi_bottom_title',
+                       parent='pwi_bottom',
+                       width=-1,
+                       enabled=False)
+        dpg.add_spacer(height=5, parent='pwi_bottom')
+
+        with dpg.theme() as title_button_theme:
+            with dpg.theme_component(dpg.mvButton, enabled_state=False):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, dpg.get_viewport_clear_color())
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, dpg.get_viewport_clear_color())
+        dpg.bind_item_theme('pwi_top_title', title_button_theme)
+        dpg.bind_item_theme('pwi_bottom_title', title_button_theme)
+
+
 
     # Tools
     with dpg.child_window(label="Tools",
@@ -61,11 +82,23 @@ with dpg.window(tag='main_window'):
                     dpg.add_input_int(label='Number of peak points',
                                       tag='npts',
                                       default_value=data.spectrum.npts,
+                                      min_value=0,
+                                      min_clamped=True,
                                       step_fast=1000,
                                       step=100,
                                       user_data=data,
                                       callback=cb.spect_plot_params,
                                       width=150)
+                    dpg.add_input_float(label='Peak FWHM',
+                                        tag='fwhm',
+                                        default_value=data.spectrum.fwhm,
+                                        step_fast=0.01,
+                                        step=0.001,
+                                        min_value=0,
+                                        min_clamped=True,
+                                        user_data=data,
+                                        callback=cb.spect_plot_params,
+                                        width=150)
                     dpg.add_input_floatx(label='Min/Max ppm',
                                          tag='spect_ppm_range',
                                          default_value=(data.spectrum.ppm_min, data.spectrum.ppm_max),
@@ -80,6 +113,9 @@ with dpg.window(tag='main_window'):
                                          user_data=data,
                                          callback=cb.spect_plot_params,
                                          width=150)
+                    dpg.add_button(label="Fit Zoom",
+                                   tag='fit_zoom',
+                                   callback=cb.spect_plot_params)
 
             # Peak Tab
             with dpg.tab(label='Peak',
@@ -94,10 +130,13 @@ with dpg.window(tag='main_window'):
                                         tag='integration',
                                         default_value=1,
                                         min_value=0,
+                                        min_clamped=True,
                                         step=1,
                                         width=150)
                     dpg.add_input_int(label='Spectrometer Frequency (MHz)',
                                       default_value=300,
+                                      min_value=1,
+                                      min_clamped=True,
                                       step=10,
                                       step_fast=100,
                                       width=150,

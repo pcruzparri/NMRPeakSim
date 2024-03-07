@@ -2,10 +2,13 @@ __all__ = ["Peak",
            "Spectrum",
            "Plot"]
 
+import warnings
+
 import numpy as np
 import matplotlib.pyplot as plt
 from .utils import *
-
+from icecream import ic
+ic.configureOutput(includeContext=True)
 
 class Peak:
     def __init__(self,
@@ -32,31 +35,31 @@ class Peak:
         return self
 
     def undo_split(self):
-        self.intensities.pop()
-        self.subpeak_shifts.pop()
-        self.splittings.pop()
-        self.couplings.pop()
+        if len(self.splittings) > 1:
+            self.intensities.pop()
+            self.subpeak_shifts.pop()
+            self.splittings.pop()
+            self.couplings.pop()
         return self
 
     def change_splitting(self, ind=1, mult=2, J=7):
-        assert ind>0
+        assert ind > 0
         if ind == len(self.splittings)-1:
             self.undo_split()
             self.split_peak(mult=mult, J=J)
         else:
-            intensities_kept = [len(i)-1 for i in self.intensities[ind+1:]]
+            splittings_kept = [get_key(mult_map, s) for s in self.splittings[ind+1:]]
             couplings_kept = self.couplings[ind+1:]
 
-            self.intensities = self.intensities[:ind]
-            self.subpeak_shifts = self.subpeak_shifts[:ind]
-            self.splittings = self.splittings[:ind]
-            self.couplings = self.couplings[:ind]
+            del self.intensities[ind:]
+            del self.subpeak_shifts[ind:]
+            del self.splittings[ind:]
+            del self.couplings[ind:]
 
             self.split_peak(mult=mult, J=J)
-            for i in range(len(intensities_kept)):
-                self.split_peak(mult=intensities_kept[i], J=couplings_kept[i])
+            for i in range(len(splittings_kept)):
+                self.split_peak(mult=splittings_kept[i], J=couplings_kept[i])
         return self
-
 
 
     def shift_center(self, delta=0):
@@ -74,13 +77,13 @@ class Peak:
                    + ', ' + "%0.2f"%self.center_shift + ' ppm' \
                    + ', ' + ''.join(self.splittings)
         else:
-            splits = sorted(zip(self.splittings[1:], [str(i) for i in self.couplings[1:]]),
+            splits = sorted(zip(self.splittings[1:], self.couplings[1:]),
                             key=lambda x: x[1], reverse=True)
 
             return str(self.integration)+'H'\
                    + ', ' + "%0.2f"%self.center_shift + ' ppm' \
                    + ', ' + ''.join([r[0] for r in splits])\
-                   + ', J = ' + ', '.join([r[1] for r in splits])+' Hz'
+                   + ', J = ' + ', '.join([str(r[1]) for r in splits])+' Hz'
 
 
 class Spectrum:
@@ -114,7 +117,8 @@ class Plot(Spectrum):
                  ppm_min=0,
                  ppm_max=10,
                  intensity_min=0,
-                 intensity_max=200,
+                 intensity_max=1,
+                 fwhm=0.004,
                  **kwargs):  # pyplot.plot kwargs
         import matplotlib.pyplot as plt
 
@@ -124,30 +128,23 @@ class Plot(Spectrum):
         self.ppm_max = ppm_max
         self.intensity_min = intensity_min
         self.intensity_max = intensity_max
+        self.fwhm = fwhm
         self.kwargs = kwargs
 
         #self.ppm = np.linspace(ppm_min, ppm_max, int(npts))
 
-    def plot_peak(self, peak_int=0, curve="lorentzian", fwhm=0.004, internal=False):
+    def plot_peak(self, peak_int=0, curve="lorentzian", internal=False):
         """
         Parameters:
         curve: str
         "lorentzian", "gaussian", "vline"
-        fwhm: float
         """
-        """
-        TODO:
-        Change this function to plot only one peak
-        Then make another function to plot all the peaks for the spectrum. 
-        Each peak will have its own number of points ideally calculated based on spect freq and req spacing per Hertz. 
-        That way, changing the FWHM captures most of the peak boundary but is guaranteed to capture multiplicity
-        for a small enough FWHM.
-        """
+
         inten, subshifts = self.peaks[peak_int].get_subpeaks()
-        ppm_points = np.linspace(subshifts[0]+3*fwhm, subshifts[-1]-3*fwhm, int(self.npts))
+        ppm_points = np.linspace(subshifts[0]+10*self.fwhm, subshifts[-1]-10*self.fwhm, int(self.npts))
 
         if curve in ['gaussian', 'lorentzian']:
-            pk = np.sum(np.array([eval(curve)(ppm_points, subshifts[i], inten[i], fwhm)
+            pk = np.sum(np.array([eval(curve)(ppm_points, subshifts[i], inten[i], self.fwhm)
                                  for i in range(len(inten))]), axis=0)
             peak = pk*self.peaks[peak_int].integration/np.sum(pk)/np.subtract(*ppm_points[[0, -1]])
 
