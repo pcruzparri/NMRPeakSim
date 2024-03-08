@@ -5,6 +5,7 @@ __all__ = ["Pascals_triangle",
            "mult_map",
            "get_key"]
 
+
 import numpy as np
 
 

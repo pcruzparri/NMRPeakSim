@@ -1,8 +1,6 @@
 import dearpygui.dearpygui as dpg
 import callbacks as cb
-import asyncio
 from nmrpeaksim.core import core
-import numpy as np
 
 
 dpg.create_context()

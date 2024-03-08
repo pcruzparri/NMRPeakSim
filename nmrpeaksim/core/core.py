@@ -2,13 +2,13 @@ __all__ = ["Peak",
            "Spectrum",
            "Plot"]
 
-import warnings
 
 import numpy as np
 import matplotlib.pyplot as plt
-from .utils import *
+from nmrpeaksim.core.utils import *
 from icecream import ic
 ic.configureOutput(includeContext=True)
+
 
 class Peak:
     def __init__(self,
@@ -61,7 +61,6 @@ class Peak:
                 self.split_peak(mult=splittings_kept[i], J=couplings_kept[i])
         return self
 
-
     def shift_center(self, delta=0):
         self.center_shift += delta
         self.subpeak_shifts = [[subshift + delta for subshift in splitting]
@@ -79,6 +78,7 @@ class Peak:
         else:
             splits = sorted(zip(self.splittings[1:], self.couplings[1:]),
                             key=lambda x: x[1], reverse=True)
+            splits = [split for split in splits if split[1] != 0]
 
             return str(self.integration)+'H'\
                    + ', ' + "%0.2f"%self.center_shift + ' ppm' \
@@ -160,7 +160,7 @@ class Plot(Spectrum):
 
     def plot_all(self, **kwargs): # same parameters as plot_peak except peak_int
         peaks_to_plot = (self.plot_peak(peak_int=i, **kwargs) for i in range(len(self.peaks)))
-        if 'internal' in kwargs.keys() and internal:
+        if 'internal' in kwargs.keys() and kwargs['internal']:
             for peak in peaks_to_plot:
                 plt.plot(*peak, **self.kwargs)
                 plt.show()

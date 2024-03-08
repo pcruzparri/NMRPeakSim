@@ -127,6 +127,7 @@ def update_spectrum_plot(spectrum):
                                 tag=f'spect_line_{ind}')
         else:
             dpg.set_value(f'spect_line_{ind}', peak)
+            dpg.set_item_label(f'spect_line_{ind}', label=f'{ind}: {repr(spectrum.peaks[ind])}')
     dpg.fit_axis_data('spect_y_axis')
 
 
