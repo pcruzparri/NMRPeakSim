@@ -6,8 +6,6 @@ __all__ = ["Peak",
 import numpy as np
 import matplotlib.pyplot as plt
 from nmrpeaksim.core.utils import *
-from icecream import ic
-ic.configureOutput(includeContext=True)
 
 
 class Peak:

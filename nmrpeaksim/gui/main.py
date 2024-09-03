@@ -1,7 +1,6 @@
 import dearpygui.dearpygui as dpg
-import callbacks as cb
+import nmrpeaksim.gui.callbacks as cb
 from nmrpeaksim.core import core
-
 
 dpg.create_context()
 dpg.create_viewport(title='NMRPeakSim')

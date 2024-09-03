@@ -1,6 +1,6 @@
 from nmrpeaksim.core.utils import *
 import dearpygui.dearpygui as dpg
-from icecream import ic
+#from icecream import ic
 
 
 def spect_gui_resize_callback():
