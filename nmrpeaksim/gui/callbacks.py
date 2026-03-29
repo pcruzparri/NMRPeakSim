@@ -139,16 +139,26 @@ def update_tree_diagram(user_data):
     """Render the coupling tree diagram for the currently selected peak."""
     dpg.delete_item('tree_canvas', children_only=True)
 
-    canvas_w = dpg.get_item_width('tree_canvas')
-    canvas_h = dpg.get_item_height('tree_canvas')
+    canvas_w    = dpg.get_item_width('tree_canvas')
+    canvas_h    = dpg.get_item_height('tree_canvas')
+    margin_x    = 12
+    margin_top  = 24   # clearance below the title row
+    axis_h      = 38   # fixed pixels reserved at the bottom for the Hz number line
+    label_col_w = 140  # right-side column for level labels
+    draw_w      = canvas_w - label_col_w
 
-    # ── Title (always drawn) ──────────────────────────────────────────────────
-    title_text = 'Coupling Tree'
-    dpg.draw_text([canvas_w / 2 - len(title_text) * 4.5, 4],
-                  title_text, color=[200, 200, 200, 230], size=16, parent='tree_canvas')
+    # ── Titles (always drawn, white) ──────────────────────────────────────────
+    _ct_hdr = 'Coupling Tree'
+    dpg.draw_text([draw_w / 2 - len(_ct_hdr) * 4.5, 4],
+                  _ct_hdr, color=[255, 255, 255, 255], size=16,
+                  parent='tree_canvas')
+    _split_hdr = 'Splitting'
+    dpg.draw_text([draw_w + label_col_w / 2 - len(_split_hdr) * 4.5, 4],
+                  _split_hdr, color=[255, 255, 255, 255], size=16,
+                  parent='tree_canvas')
 
     if user_data.selected_peak is None or not user_data.spectrum.peaks:
-        dpg.draw_text([10, 34], 'No peak selected',
+        dpg.draw_text([margin_x, margin_top + 10], 'No peak selected',
                       color=[140, 140, 140, 200], size=18, parent='tree_canvas')
         return
 
@@ -158,13 +168,6 @@ def update_tree_diagram(user_data):
     splittings = peak.splittings
     couplings = peak.couplings
     n_levels = len(intensities)
-
-    margin_x  = 12
-    margin_top = 28   # clearance above the topmost line tip (includes title)
-    axis_h    = 38    # fixed pixels reserved at the bottom for the Hz number line
-    label_col_w = 140  # right-side column for level labels
-
-    draw_w = canvas_w - label_col_w
 
     # ── X-axis: singlet always centered; axis expands smoothly but slower than peaks
     center_ppm = peak.center_shift
@@ -278,14 +281,54 @@ def update_tree_diagram(user_data):
                           color=color, thickness=thickness, parent='tree_canvas')
 
         lbl = 's' if level == 0 else f'{splittings[level]},  J = {int(couplings[level])} Hz'
-        dpg.draw_text([draw_w + 6, y_base - line_h / 2 - 8],
+        lbl_x = draw_w + label_col_w / 2 - len(lbl) * 4.5
+        dpg.draw_text([lbl_x, y_base - line_h / 2 - 8],
                       lbl, color=color, size=16, parent='tree_canvas')
 
-    # ── Hz markers: centred on child lines, stacked vertically if they overlap ──
+    # ── Hz number line — pinned to the bottom, fixed to axis_bound_hz ───────────
+    y_axis = canvas_h - axis_h // 2
+    # tick_hz already computed above for the gridlines
+
+    dpg.draw_line([margin_x, y_axis], [draw_w - margin_x, y_axis],
+                  color=[170, 170, 170, 210], thickness=2.0, parent='tree_canvas')
+
+    # "Hz" unit label anchored to the right of the axis bar
+    dpg.draw_text([draw_w - margin_x + 4, y_axis - 8],
+                  'Hz', color=[160, 160, 160, 230], size=14, parent='tree_canvas')
+
+    # Major ticks with labels
+    t = 0.0
+    while t <= axis_bound_hz + 0.01:
+        for hz_val in ([0.0] if t == 0 else [t, -t]):
+            tx = ppm_to_x(center_ppm + hz_val / peak.field)
+            if margin_x <= tx <= draw_w - margin_x:
+                dpg.draw_line([tx, y_axis - 6], [tx, y_axis + 6],
+                              color=[170, 170, 170, 210], thickness=2.0, parent='tree_canvas')
+                lbl = '0' if hz_val == 0 else f'{hz_val:g}'
+                dpg.draw_text([tx - len(lbl) * 4, y_axis + 8],
+                              lbl, color=[160, 160, 160, 230], size=13, parent='tree_canvas')
+        t = tick_hz if t == 0 else t + tick_hz
+
+    # Minor ticks at every 1 Hz (no label, shorter stem; skip positions already
+    # occupied by a major tick)
+    t = 1.0
+    while t <= axis_bound_hz + 0.01:
+        for hz_val in [t, -t]:
+            if t % tick_hz == 0:          # coincides with a major tick — skip
+                continue
+            tx = ppm_to_x(center_ppm + hz_val / peak.field)
+            if margin_x <= tx <= draw_w - margin_x:
+                dpg.draw_line([tx, y_axis - 3], [tx, y_axis + 3],
+                              color=[140, 140, 140, 160], thickness=1.0, parent='tree_canvas')
+        t += 1.0
+
+    # ── Hz markers: drawn last so arrowheads sit on top of everything ─────────
+    # Arrow color is darkened so heads remain visible against the subpeak lines.
     V_GAP = 24   # px between stacked rows of arrows
 
     for level in range(1, n_levels):
-        color = LEVEL_COLORS[level % len(LEVEL_COLORS)]
+        color      = LEVEL_COLORS[level % len(LEVEL_COLORS)]
+        arrow_color = [int(c * 0.55) for c in color[:3]] + [color[3]]
         n_par = len(subpeak_shifts[level - 1])
         mult  = len(subpeak_shifts[level]) // n_par
         if mult < 2:
@@ -307,8 +350,8 @@ def update_tree_diagram(user_data):
 
         # Greedy interval-scheduling: assign each pair to the first row where it
         # doesn't overlap with the already-placed rightmost marker.
-        sort_idx  = sorted(range(len(pairs)), key=lambda i: pairs[i][0])
-        row_of    = [0] * len(pairs)
+        sort_idx   = sorted(range(len(pairs)), key=lambda i: pairs[i][0])
+        row_of     = [0] * len(pairs)
         rows_right = []   # tracks rightmost xb placed in each row
 
         for i in sort_idx:
@@ -331,35 +374,14 @@ def update_tree_diagram(user_data):
             y = y_mid + (row_of[i] - (n_rows - 1) / 2) * V_GAP
 
             dpg.draw_arrow([xb, y], [xa, y],
-                           color=color, thickness=1.5, size=7, parent='tree_canvas')
+                           color=arrow_color, thickness=1.5, size=7, parent='tree_canvas')
             dpg.draw_arrow([xa, y], [xb, y],
-                           color=color, thickness=1.5, size=7, parent='tree_canvas')
+                           color=arrow_color, thickness=1.5, size=7, parent='tree_canvas')
 
             marker_lbl = f'{int(couplings[level])} Hz'
             lx = (xa + xb) / 2 - len(marker_lbl) * 4
             dpg.draw_text([lx, y - 16],
                           marker_lbl, color=color, size=15, parent='tree_canvas')
-
-    # ── Hz number line — pinned to the bottom, fixed to axis_bound_hz ───────────
-    y_axis = canvas_h - axis_h // 2
-    # tick_hz already computed above for the gridlines
-
-    dpg.draw_line([margin_x, y_axis], [draw_w - margin_x, y_axis],
-                  color=[170, 170, 170, 210], thickness=2.0, parent='tree_canvas')
-    dpg.draw_text([draw_w - margin_x + 4, y_axis - 8],
-                  'Hz', color=[160, 160, 160, 230], size=14, parent='tree_canvas')
-
-    t = 0.0
-    while t <= axis_bound_hz + 0.01:
-        for hz_val in ([0.0] if t == 0 else [t, -t]):
-            tx = ppm_to_x(center_ppm + hz_val / peak.field)
-            if margin_x <= tx <= draw_w - margin_x:
-                dpg.draw_line([tx, y_axis - 6], [tx, y_axis + 6],
-                              color=[170, 170, 170, 210], thickness=2.0, parent='tree_canvas')
-                lbl = '0' if hz_val == 0 else f'{hz_val:g}'
-                dpg.draw_text([tx - len(lbl) * 4, y_axis + 8],
-                              lbl, color=[160, 160, 160, 230], size=13, parent='tree_canvas')
-        t = tick_hz if t == 0 else t + tick_hz
 
 
 def spect_plot_params(sender, app_data, user_data):
@@ -407,23 +429,12 @@ def viewport_resize_callback(sender, app_data):
     dpg.configure_item('tools_window', pos=(left_pair_total + peak_info_w, 0), height=top_h)
     dpg.configure_item('plot_window', pos=(0, top_h))
 
-    # Sliders are fixed at 150 px; centre them in the fixed-width panel
-    slider_w = 150
-    indent   = max(0, (peak_info_w - slider_w) // 2)
-    for panel in ('pwi_top', 'pwi_bottom'):
-        for child in dpg.get_item_children(panel, 1):
-            if 'SliderInt' in dpg.get_item_type(child):
-                dpg.configure_item(child, indent=indent)
-
     if _run_data is not None:
         update_tree_diagram(_run_data)
 
 
 def peak_info_update(user_data):
     peak = user_data.spectrum.peaks[user_data.selected_peak]
-    slider_w = 150
-    panel_w = dpg.get_item_width('pwi_top')
-    indent = max(0, (panel_w - slider_w) // 2) if panel_w > slider_w else 0
 
     if len(peak.splittings) > 1:
         for ind, split in enumerate(peak.splittings[1:]):
@@ -435,8 +446,7 @@ def peak_info_update(user_data):
                                    min_value=1,
                                    max_value=9,
                                    parent='pwi_top',
-                                   width=slider_w,
-                                   indent=indent,
+                                   width=150,
                                    user_data=user_data,
                                    callback=update_splitting_callback)
                 dpg.add_slider_int(label=f'J{ind+1}',
@@ -444,8 +454,7 @@ def peak_info_update(user_data):
                                    default_value=peak.couplings[ind+1],
                                    max_value=50,
                                    parent='pwi_bottom',
-                                   width=slider_w,
-                                   indent=indent,
+                                   width=150,
                                    user_data=user_data,
                                    callback=update_coupling_callback)
             elif not dpg.is_item_shown(f'split{ind+1}'):

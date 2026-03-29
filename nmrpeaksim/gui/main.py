@@ -44,6 +44,10 @@ def main():
         # Coupling Tree Diagram
         with dpg.child_window(tag='tree_window', no_scrollbar=True):
             dpg.add_drawlist(tag='tree_canvas', width=400, height=200)
+        with dpg.theme() as _tree_border_theme:
+            with dpg.theme_component(dpg.mvChildWindow):
+                dpg.add_theme_color(dpg.mvThemeCol_Border, [110, 110, 110, 200])
+        dpg.bind_item_theme('tree_window', _tree_border_theme)
 
         # Plotting Peak Info
         with dpg.child_window(tag='peak_info_window',
