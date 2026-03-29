@@ -4,7 +4,6 @@ __all__ = ["Peak",
 
 
 import numpy as np
-import matplotlib.pyplot as plt
 from nmrpeaksim.core.utils import *
 
 
@@ -117,9 +116,7 @@ class Plot(Spectrum):
                  intensity_min=0,
                  intensity_max=1,
                  fwhm=0.004,
-                 **kwargs):  # pyplot.plot kwargs
-        import matplotlib.pyplot as plt
-
+                 **kwargs):
         super().__init__()
         self.npts = npts
         self.ppm_min = ppm_min
@@ -131,11 +128,11 @@ class Plot(Spectrum):
 
         #self.ppm = np.linspace(ppm_min, ppm_max, int(npts))
 
-    def plot_peak(self, peak_int=0, curve="lorentzian", internal=False):
+    def plot_peak(self, peak_int=0, curve="lorentzian"):
         """
         Parameters:
         curve: str
-        "lorentzian", "gaussian", "vline"
+        "lorentzian" or "gaussian"
         """
 
         inten, subshifts = self.peaks[peak_int].get_subpeaks()
@@ -145,25 +142,13 @@ class Plot(Spectrum):
             pk = np.sum(np.array([eval(curve)(ppm_points, subshifts[i], inten[i], self.fwhm)
                                  for i in range(len(inten))]), axis=0)
             peak = pk*self.peaks[peak_int].integration/np.sum(pk)/np.subtract(*ppm_points[[0, -1]])
-
         else:
             raise ValueError('Please pass the correct lineshape using the curve parameter.')
 
-        if internal:
-            plt.plot(ppm_points, peak*self.peaks[peak_int].integration/np.sum(pk)/np.subtract(*ppm_points[[0, -1]]),
-                     **self.kwargs)
-            plt.show()
-        else:
-            return ppm_points, peak
+        return ppm_points, peak
 
-    def plot_all(self, **kwargs): # same parameters as plot_peak except peak_int
-        peaks_to_plot = (self.plot_peak(peak_int=i, **kwargs) for i in range(len(self.peaks)))
-        if 'internal' in kwargs.keys() and kwargs['internal']:
-            for peak in peaks_to_plot:
-                plt.plot(*peak, **self.kwargs)
-                plt.show()
-        else:
-            return peaks_to_plot
+    def plot_all(self, **kwargs):
+        return (self.plot_peak(peak_int=i, **kwargs) for i in range(len(self.peaks)))
 
     def custom_options(self, methods: list):
         for m in methods: m
