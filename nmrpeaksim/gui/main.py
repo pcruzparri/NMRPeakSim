@@ -42,7 +42,7 @@ def main():
                 dpg.add_line_series([], [], parent='peak_y_axis', tag='view_peak_line')
 
         # Coupling Tree Diagram
-        with dpg.child_window(tag='tree_window', no_scrollbar=True):
+        with dpg.child_window(tag='tree_window'):  # vertical scroll enabled; no horizontal
             dpg.add_drawlist(tag='tree_canvas', width=400, height=200)
         with dpg.theme() as _tree_border_theme:
             with dpg.theme_component(dpg.mvChildWindow):

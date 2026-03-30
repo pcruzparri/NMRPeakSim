@@ -158,6 +158,8 @@ def update_tree_diagram(user_data):
                   parent='tree_canvas')
 
     if user_data.selected_peak is None or not user_data.spectrum.peaks:
+        # Reset canvas to the window height when there is nothing to show
+        dpg.configure_item('tree_canvas', height=dpg.get_item_height('tree_window') - 4)
         dpg.draw_text([margin_x, margin_top + 10], 'No peak selected',
                       color=[140, 140, 140, 200], size=18, parent='tree_canvas')
         return
@@ -187,25 +189,51 @@ def update_tree_diagram(user_data):
         # NMR convention: high ppm → left
         return center_x - (ppm - center_ppm) * scale_px
 
-    # ── Y-axis row layout ─────────────────────────────────────────────────────
-    # The drawable band (for lines + edges) runs from (margin_top + line_h) to
-    # (canvas_h - axis_h).  That way:
-    #   • level 0's line tip is exactly at margin_top  (fully visible)
-    #   • level N-1's baseline sits at the top of the axis area
-    # We choose line_h first (fixed), then derive row spacing from what remains.
+    # ── Pre-compute merged groups for all levels ──────────────────────────────
+    # Needed for: (1) row-height layout, (2) edge tip alignment.
+    all_px_groups = []   # list of (px_groups, px_x_exact, min_int) per level
+    for _lvl in range(n_levels):
+        _grp, _exact = defaultdict(float), {}
+        for _ni in range(len(subpeak_shifts[_lvl])):
+            _x  = ppm_to_x(subpeak_shifts[_lvl][_ni])
+            _pk = round(_x)
+            _grp[_pk] += intensities[_lvl][_ni]
+            if _pk not in _exact:
+                _exact[_pk] = _x
+        all_px_groups.append((_grp, _exact, min(intensities[_lvl])))
 
-    draw_band_h = canvas_h - axis_h - margin_top   # total px for lines + gaps
-    # line_h: ~22 % of the band, capped so it never exceeds half the band
-    line_h = min(draw_band_h * 0.22, 70)
+    # ── Proportional row layout (scrollable canvas) ───────────────────────────
+    # base_h is fixed so lines are always the same readable size regardless of
+    # pattern complexity. The canvas grows to fit; the window scrolls as needed.
+    #
+    # Each row's height = base_h × max_merged / min_int (actual current tallest
+    # line). Rows are tight around real content — no reserved worst-case space.
+    # When overlap increases and a merged line grows taller, the row expands and
+    # the baselines below slide down, keeping everything within bounds.
+    base_h = 45   # fixed px height for a unit-intensity line
 
-    # Baselines: span from (margin_top + line_h) down to (canvas_h - axis_h)
-    y_first = margin_top + line_h          # baseline of level 0
-    y_last  = canvas_h  - axis_h           # baseline of last level
+    level_ratios = [max(g.values()) / mi for g, _, mi in all_px_groups]
+
+    ROW_GAP = 20  # minimum px of diagonal space between parent baseline and child tip
+
+    # Compute and apply the dynamic canvas height, then read it back.
+    canvas_h = int(base_h * sum(level_ratios) + ROW_GAP * n_levels + axis_h + margin_top)
+    canvas_h = max(canvas_h, dpg.get_item_height('tree_window') - 4)
+    dpg.configure_item('tree_canvas', height=canvas_h)
+
+    _y = margin_top
+    y_bases = []
+    for _r in level_ratios:
+        _y += base_h * _r + ROW_GAP
+        y_bases.append(_y)
+
+    # A lone singlet looks better vertically centred in the visible window.
+    if n_levels == 1:
+        win_h = dpg.get_item_height('tree_window')
+        y_bases[0] = (margin_top + win_h - axis_h) / 2
 
     def level_to_y(lvl):
-        if n_levels == 1:
-            return (y_first + y_last) / 2
-        return y_first + lvl * (y_last - y_first) / (n_levels - 1)
+        return y_bases[lvl]
 
     LEVEL_COLORS = [
         [210, 210, 210, 255],   # grey   — singlet
@@ -237,8 +265,9 @@ def update_tree_diagram(user_data):
                               color=GRID_COLOR, thickness=1.0, parent='tree_canvas')
         t = tick_hz if t == 0 else t + tick_hz
 
-    # ── Edges: base of parent → tip of child ─────────────────────────────────
+    # ── Edges: base of parent → actual tip of child ──────────────────────────
     for level in range(n_levels - 1):
+        child_grp, _, child_min = all_px_groups[level + 1]
         n_par = len(subpeak_shifts[level])
         mult  = len(subpeak_shifts[level + 1]) // n_par
         for pi in range(n_par):
@@ -246,8 +275,9 @@ def update_tree_diagram(user_data):
             py = level_to_y(level)                    # base of parent
             for k in range(mult):
                 ci = pi * mult + k
-                cx = ppm_to_x(subpeak_shifts[level + 1][ci])
-                cy = level_to_y(level + 1) - line_h   # tip of child
+                cx   = ppm_to_x(subpeak_shifts[level + 1][ci])
+                c_merged = child_grp.get(round(cx), child_min)
+                cy   = level_to_y(level + 1) - base_h * c_merged / child_min
                 dpg.draw_line([px, py], [cx, cy],
                               color=EDGE_COLOR, thickness=2.0, parent='tree_canvas')
 
@@ -259,30 +289,19 @@ def update_tree_diagram(user_data):
         color  = LEVEL_COLORS[level % len(LEVEL_COLORS)]
         y_base = level_to_y(level)
 
-        # Group subpeaks by rounded pixel x — detect overlaps
-        px_groups  = defaultdict(float)   # px_key → summed intensity
-        px_x_exact = {}                   # px_key → first exact x position
-        for node_idx in range(len(subpeak_shifts[level])):
-            x      = ppm_to_x(subpeak_shifts[level][node_idx])
-            px_key = round(x)
-            px_groups[px_key]  += intensities[level][node_idx]
-            if px_key not in px_x_exact:
-                px_x_exact[px_key] = x
-
-        min_int = min(intensities[level])
+        px_groups, px_x_exact, min_int = all_px_groups[level]
         for px_key, total_intensity in px_groups.items():
-            x         = px_x_exact[px_key]
-            thickness = BASE_THICKNESS * total_intensity / min_int
-            # TODO: for high multiplets (sextet+) the proportional thickness makes even
-            # non-overlapping lines hard to distinguish. Consider an alternative encoding
-            # (e.g. color opacity, a small numeric intensity label, or a variable-height
-            # bar chart style) so individual subpeaks remain visually separable.
-            dpg.draw_line([x, y_base], [x, y_base - line_h],
-                          color=color, thickness=thickness, parent='tree_canvas')
+            x = px_x_exact[px_key]
+            # Height is proportional to merged intensity; base_h is the unit height.
+            # The row was sized so the all-overlap maximum exactly fills it.
+            h = base_h * total_intensity / min_int
+            dpg.draw_line([x, y_base], [x, y_base - h],
+                          color=color, thickness=BASE_THICKNESS, parent='tree_canvas')
 
-        lbl = 's' if level == 0 else f'{splittings[level]},  J = {int(couplings[level])} Hz'
+        lbl   = 's' if level == 0 else f'{splittings[level]},  J = {int(couplings[level])} Hz'
         lbl_x = draw_w + label_col_w / 2 - len(lbl) * 4.5
-        dpg.draw_text([lbl_x, y_base - line_h / 2 - 8],
+        max_h = base_h * max(px_groups.values()) / min_int
+        dpg.draw_text([lbl_x, y_base - max_h / 2 - 8],
                       lbl, color=color, size=16, parent='tree_canvas')
 
     # ── Hz number line — pinned to the bottom, fixed to axis_bound_hz ───────────
@@ -334,8 +353,8 @@ def update_tree_diagram(user_data):
         if mult < 2:
             continue
 
-        # Midpoint of each child vertical line
-        y_mid = level_to_y(level) - line_h / 2
+        # Midpoint of a unit-intensity child line
+        y_mid = level_to_y(level) - base_h / 2
 
         # Collect (xa, xb) for every adjacent pair within the same parent group
         # xa < xb in pixel space (xa is further left = higher ppm)
@@ -420,7 +439,8 @@ def viewport_resize_callback(sender, app_data):
 
     dpg.configure_item('peak_window', width=half_left_w, height=top_h, pos=(0, 0))
     dpg.configure_item('tree_window', width=half_left_w, height=top_h, pos=(half_left_w, 0))
-    dpg.configure_item('tree_canvas', width=half_left_w - 16, height=top_h - 16)
+    dpg.configure_item('tree_canvas', width=half_left_w - 16)
+    # canvas height is set dynamically by update_tree_diagram based on content
 
     dpg.configure_item('peak_info_window', width=peak_info_w, height=top_h, pos=(left_pair_total, 0))
     dpg.configure_item('pwi_top',    width=peak_info_w, height=top_h // 2, pos=(0, 0))
