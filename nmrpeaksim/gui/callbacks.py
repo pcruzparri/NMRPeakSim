@@ -30,6 +30,8 @@ def peak_remove_callback(sender, app_data, user_data):
 
 def peak_modify_callback(sender, app_data, user_data):
     ind = peak_select_update(sender, app_data, user_data)[0]
+    if ind is None:
+        return
     if sender == 'undo_split':
         getattr(user_data.spectrum, 'modify')(ind, sender)
     else:
@@ -58,7 +60,8 @@ def peak_select_update(sender, app_data, user_data):
             user_data.selected_peak = 0
         else:
             user_data.selected_peak = int(app_data.split(':')[0])
-        update_peak_plot(user_data.spectrum, ind=user_data.selected_peak, label=user_data.peaks[user_data.selected_peak])
+        ind, label = selected_peak_label(user_data)
+        update_peak_plot(user_data.spectrum, ind=ind, label=label)
 
     # Cases for creating, deleting, and modifying the peaks
     else:
@@ -82,7 +85,7 @@ def peak_select_update(sender, app_data, user_data):
             update_spectrum_plot(user_data.spectrum)
             update_peak_plot(user_data.spectrum, ind=user_data.selected_peak)
             update_tree_diagram(user_data)
-            return
+            return None, ''
 
         # handle when an item is selected but it's label is no longer present or accurate
         elif selected and selected not in peak_labels:
@@ -107,13 +110,13 @@ def peak_select_update(sender, app_data, user_data):
 
     peak_info_update(user_data)
     update_tree_diagram(user_data)
-    return user_data.selected_peak, user_data.peaks[user_data.selected_peak]
+    return selected_peak_label(user_data)
 
 
 def selected_peak_label(user_data) -> Tuple[Optional[int], str]:
     """Return (ind, label) for the current selection, or (None, '') if there is none."""
     ind = user_data.selected_peak
-    if ind is None or not user_data.peaks:
+    if ind is None or not 0 <= ind < len(user_data.peaks):
         return None, ''
     return ind, user_data.peaks[ind]
 
@@ -463,7 +466,10 @@ def viewport_resize_callback(sender, app_data):
 
 
 def peak_info_update(user_data):
-    peak = user_data.spectrum.peaks[user_data.selected_peak]
+    sel = user_data.selected_peak
+    if sel is None or not 0 <= sel < len(user_data.spectrum.peaks):
+        return
+    peak = user_data.spectrum.peaks[sel]
 
     if len(peak.splittings) > 1:
         for ind, split in enumerate(peak.splittings[1:]):
