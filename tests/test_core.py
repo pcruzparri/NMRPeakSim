@@ -295,3 +295,45 @@ def test_plot_peak_invalid_curve():
     p.add_peak(center_shift=1.5)
     with pytest.raises(ValueError):
         p.plot_peak(peak_int=0, curve='triangle')
+
+
+@pytest.mark.parametrize('npts', [100, 500, 2000, 8000])
+@pytest.mark.parametrize('curve', ['lorentzian', 'gaussian'])
+def test_plot_peak_area_equals_integration(npts, curve):
+    p = Plot(npts=npts)
+    p.add_peak(center_shift=1.5, integration=3)
+    p.peaks[0].split_peak(mult=3, J=7)
+    x, y = p.plot_peak(peak_int=0, curve=curve)
+    dx = abs(x[0] - x[1])
+    assert np.isclose(np.sum(y) * dx, 3, rtol=1e-9)
+
+
+def test_plot_peak_scale_independent_of_npts():
+    # Heights converge rather than match exactly: a coarse grid need not sample
+    # the lineshape maximum. The tolerance is still far tighter than the
+    # npts-proportional scaling this guards against.
+    heights = []
+    for npts in (500, 2000, 8000):
+        p = Plot(npts=npts)
+        p.add_peak(center_shift=1.5, integration=1)
+        _, y = p.plot_peak(peak_int=0)
+        heights.append(y.max())
+    assert np.allclose(heights, heights[0], rtol=1e-2)
+
+
+def test_plot_peak_relative_integrations_preserved():
+    p = Plot(npts=2000)
+    p.add_peak(center_shift=1.0, integration=1)
+    p.add_peak(center_shift=5.0, integration=3)
+    areas = []
+    for x, y in p.plot_all():
+        areas.append(np.sum(y) * abs(x[0] - x[1]))
+    assert np.isclose(areas[1] / areas[0], 3, rtol=1e-9)
+
+
+@pytest.mark.parametrize('npts', [0, 1])
+def test_plot_peak_rejects_degenerate_npts(npts):
+    p = Plot(npts=npts)
+    p.add_peak(center_shift=1.5)
+    with pytest.raises(ValueError, match='npts must be at least 2'):
+        p.plot_peak(peak_int=0)
