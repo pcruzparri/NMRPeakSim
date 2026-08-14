@@ -84,6 +84,7 @@ def peak_select_update(sender, app_data, user_data):
             dpg.set_value('peak_select', '')
             update_spectrum_plot(user_data.spectrum)
             update_peak_plot(user_data.spectrum, ind=user_data.selected_peak)
+            peak_info_update(user_data)
             update_tree_diagram(user_data)
             return None, ''
 
@@ -465,9 +466,20 @@ def viewport_resize_callback(sender, app_data):
         update_tree_diagram(_run_data)
 
 
+def hide_splitting_sliders(keep=0):
+    """Hide the splitting/coupling slider pairs past the first `keep`.
+
+    The [2:] skips the title button and spacer that main() puts in pwi_top.
+    """
+    for child in dpg.get_item_children('pwi_top', 1)[2:][keep:]:
+        dpg.hide_item(child)
+        dpg.hide_item('coupling' + dpg.get_item_alias(child).lstrip('split'))
+
+
 def peak_info_update(user_data):
     sel = user_data.selected_peak
     if sel is None or not 0 <= sel < len(user_data.spectrum.peaks):
+        hide_splitting_sliders()
         return
     peak = user_data.spectrum.peaks[sel]
 
@@ -497,11 +509,7 @@ def peak_info_update(user_data):
                 dpg.show_item(f'coupling{ind+1}')
                 dpg.set_value(f'split{ind+1}', mult_default)
                 dpg.set_value(f'coupling{ind+1}', peak.couplings[ind+1])
-    diff = len(peak.splittings[1:]) - len(dpg.get_item_children('pwi_top', 1)[2:])
-    if diff < 0:
-        for child in dpg.get_item_children('pwi_top', 1)[2:][diff:]:
-            dpg.hide_item(child)
-            dpg.hide_item('coupling'+dpg.get_item_alias(child).lstrip('split'))
+    hide_splitting_sliders(keep=len(peak.splittings) - 1)
 
 
 def update_coupling_callback(sender, app_data, user_data):
