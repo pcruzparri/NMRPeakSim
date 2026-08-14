@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Optional, Tuple
 from nmrpeaksim.core.utils import *
 import dearpygui.dearpygui as dpg
 
@@ -107,6 +108,14 @@ def peak_select_update(sender, app_data, user_data):
     peak_info_update(user_data)
     update_tree_diagram(user_data)
     return user_data.selected_peak, user_data.peaks[user_data.selected_peak]
+
+
+def selected_peak_label(user_data) -> Tuple[Optional[int], str]:
+    """Return (ind, label) for the current selection, or (None, '') if there is none."""
+    ind = user_data.selected_peak
+    if ind is None or not user_data.peaks:
+        return None, ''
+    return ind, user_data.peaks[ind]
 
 
 def update_peak_plot(spectrum, ind=0, label=''):
@@ -407,9 +416,8 @@ def spect_plot_params(sender, app_data, user_data):
     if sender == 'npts':
         user_data.spectrum.npts = app_data
         update_spectrum_plot(user_data.spectrum)
-        update_peak_plot(user_data.spectrum,
-                         user_data.selected_peak,
-                         user_data.peaks[user_data.selected_peak])
+        ind, label = selected_peak_label(user_data)
+        update_peak_plot(user_data.spectrum, ind=ind, label=label)
     elif sender == 'spect_ppm_range':
         dpg.set_axis_limits('spect_x_axis', *app_data[:2])
     elif sender == 'spect_int_range':
@@ -417,7 +425,8 @@ def spect_plot_params(sender, app_data, user_data):
     elif sender == 'fwhm':
         user_data.spectrum.fwhm = app_data
         update_spectrum_plot(user_data.spectrum)
-        update_peak_plot(user_data.spectrum, ind=user_data.selected_peak, label=user_data.peaks[user_data.selected_peak])
+        ind, label = selected_peak_label(user_data)
+        update_peak_plot(user_data.spectrum, ind=ind, label=label)
     elif sender == 'fit_zoom':
         dpg.set_axis_limits_auto('spect_x_axis')
         dpg.set_axis_limits_auto('spect_y_axis')
@@ -495,7 +504,8 @@ def update_coupling_callback(sender, app_data, user_data):
     mult = dpg.get_value('split'+sender.lstrip('coupling'))
     peak.change_splitting(ind=int(ind), mult=mult, J=app_data)
 
-    update_peak_plot(user_data.spectrum, user_data.selected_peak, user_data.peaks[user_data.selected_peak])
+    sel, label = selected_peak_label(user_data)
+    update_peak_plot(user_data.spectrum, ind=sel, label=label)
     update_spectrum_plot(user_data.spectrum)
     peak_select_update(sender, None, user_data)
 
@@ -507,8 +517,9 @@ def update_splitting_callback(sender, app_data, user_data):
     peak.change_splitting(ind=int(ind), mult=app_data, J=J)
 
     dpg.set_item_label(sender, f'J{ind},{mult_map[app_data]}')
-    dpg.set_item_label('coupling'+sender.lstrip('split'), f'J{ind},{mult_map[app_data]}')
+    dpg.set_item_label('coupling'+sender.lstrip('split'), f'J{ind}')
 
-    update_peak_plot(user_data.spectrum, user_data.selected_peak, user_data.peaks[user_data.selected_peak])
+    sel, label = selected_peak_label(user_data)
+    update_peak_plot(user_data.spectrum, ind=sel, label=label)
     update_spectrum_plot(user_data.spectrum)
     peak_select_update(sender, None, user_data)
