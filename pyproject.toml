@@ -10,3 +10,6 @@ dependencies = ["numpy", "dearpygui"]
 
 [project.scripts]
 nmrpeaksim = "nmrpeaksim.gui.main:main"
+
+[tool.setuptools]
+packages = ["nmrpeaksim", "nmrpeaksim.core", "nmrpeaksim.gui"]
