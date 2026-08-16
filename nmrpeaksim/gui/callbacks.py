@@ -170,14 +170,15 @@ def update_tree_diagram(user_data):
                   _split_hdr, color=[255, 255, 255, 255], size=16,
                   parent='tree_canvas')
 
-    if user_data.selected_peak is None or not user_data.spectrum.peaks:
+    sel = user_data.selected_peak
+    if sel is None or not 0 <= sel < len(user_data.spectrum.peaks):
         # Reset canvas to the window height when there is nothing to show
         dpg.configure_item('tree_canvas', height=dpg.get_item_height('tree_window') - 4)
         dpg.draw_text([margin_x, margin_top + 10], 'No peak selected',
                       color=[140, 140, 140, 200], size=18, parent='tree_canvas')
         return
 
-    peak = user_data.spectrum.peaks[user_data.selected_peak]
+    peak = user_data.spectrum.peaks[sel]
     intensities = peak.intensities
     subpeak_shifts = peak.subpeak_shifts
     splittings = peak.splittings

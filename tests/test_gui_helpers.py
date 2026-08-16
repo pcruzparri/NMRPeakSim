@@ -149,6 +149,18 @@ def test_sliders_hidden_when_last_peak_removed(stub):
     assert visible(stub) == []
 
 
+@pytest.mark.parametrize('selected', [5, -1, None])
+def test_tree_diagram_survives_a_bad_selection(stub, selected):
+    # update_tree_diagram runs immediately after peak_info_update in
+    # peak_select_update, so it needs the same bounds check or the crash
+    # simply moves down two lines.
+    d = FakeSpectrumData()
+    d.spectrum.add_peak(center_shift=1.5)
+    d.peaks = ['0: 1H, 1.50 ppm, s']
+    d.selected_peak = selected
+    cb.update_tree_diagram(d)
+
+
 def test_sliders_return_after_re_adding_a_peak(stub):
     d = FakeSpectrumData()
     d.spectrum.add_peak(center_shift=1.5)
