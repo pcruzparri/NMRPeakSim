@@ -29,10 +29,10 @@ declares looser lower bounds for installing the package alongside other things.
 nmrpeaksim
 ```
 
-Or without installing the console script:
+Or as a module:
 
 ```bash
-python nmrpeaksim/gui/main.py
+python -m nmrpeaksim.gui.main
 ```
 
 ## The window
