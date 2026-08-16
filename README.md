@@ -9,7 +9,11 @@ assign — not for fitting real data.
 
 ## Install
 
-Requires Python 3.10 or newer.
+On Windows, download `NMRPeakSim.exe` from the
+[latest release](https://github.com/pcruzparri/NMRPeakSim/releases/latest) and run it.
+Nothing else needed — Python is bundled.
+
+To run from source instead, on any platform, you'll want Python 3.10 or newer:
 
 ```bash
 python -m venv .venv
@@ -88,6 +92,16 @@ The test suite covers the core model (peak construction, splitting, undo, normal
 and the GUI helpers that don't need a live DearPyGui context. The rendering callbacks are
 not covered — those need a display.
 
+To cut a release, bump the version in `pyproject.toml`, then tag the commit to match:
+
+```bash
+git tag -a v0.1.0 -m "First release"
+git push origin v0.1.0
+```
+
+CI builds the Windows executable and publishes it. A tag that doesn't match the version
+in `pyproject.toml` fails the build rather than shipping a mislabelled binary.
+
 ## Layout
 
 ```
@@ -101,9 +115,3 @@ nmrpeaksim/
 tests/
 ```
 
-## Releases
-
-Tagging a commit `vX.Y.Z` builds a standalone Windows executable and publishes it on the
-[Releases](https://github.com/pcruzparri/NMRPeakSim/releases) page. The tag has to match
-the version in `pyproject.toml` or the build fails rather than shipping a mislabelled
-binary. Nothing built is committed to the repo.
