@@ -46,7 +46,14 @@ jobs:
           pyinstaller --onefile --windowed --name NMRPeakSim
           --collect-all dearpygui nmrpeaksim/gui/main.py
 
+      # The header file carries the evergreen part (download, SmartScreen, known
+      # limits); --generate-notes appends the per-release changelog after it.
+      # --verify-tag stops gh inventing a tag if this is ever run from a branch.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$env:GITHUB_REF_NAME" dist/NMRPeakSim.exe --generate-notes
+        run: >
+          gh release create "$env:GITHUB_REF_NAME" dist/NMRPeakSim.exe
+          --verify-tag
+          --notes-file .github/release-notes-header.md
+          --generate-notes
