@@ -88,7 +88,7 @@ def main():
                         dpg.add_input_int(label='Number of peak points',
                                           tag='npts',
                                           default_value=data.spectrum.npts,
-                                          min_value=0,
+                                          min_value=2,
                                           min_clamped=True,
                                           step_fast=1000,
                                           step=100,

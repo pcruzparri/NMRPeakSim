@@ -135,13 +135,19 @@ class Plot(Spectrum):
         "lorentzian" or "gaussian"
         """
 
+        npts = int(self.npts)
+        if npts < 2:
+            raise ValueError(f'npts must be at least 2 to define a lineshape, got {npts}.')
+
         inten, subshifts = self.peaks[peak_int].get_subpeaks()
-        ppm_points = np.linspace(subshifts[0]+10*self.fwhm, subshifts[-1]-10*self.fwhm, int(self.npts))
+        ppm_points = np.linspace(subshifts[0]+10*self.fwhm, subshifts[-1]-10*self.fwhm, npts)
 
         if curve in ['gaussian', 'lorentzian']:
             pk = np.sum(np.array([eval(curve)(ppm_points, subshifts[i], inten[i], self.fwhm)
                                  for i in range(len(inten))]), axis=0)
-            peak = pk*self.peaks[peak_int].integration/np.sum(pk)/np.subtract(*ppm_points[[0, -1]])
+            # Scale so the Riemann sum over the window equals the integration.
+            dx = abs(ppm_points[0] - ppm_points[1])
+            peak = pk*self.peaks[peak_int].integration/(np.sum(pk)*dx)
         else:
             raise ValueError('Please pass the correct lineshape using the curve parameter.')
 
