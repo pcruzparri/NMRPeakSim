@@ -22,7 +22,7 @@ def peak_remove_callback(sender, app_data, user_data):
     getattr(user_data.spectrum, sender)(user_data.selected_peak)
     dpg.delete_item(f'spect_line_{user_data.selected_peak}')
     for line in dpg.get_item_children('spect_y_axis', 1):
-        line_ind = int(dpg.get_item_alias(line).strip('spect_line_'))
+        line_ind = int(dpg.get_item_alias(line).removeprefix('spect_line_'))
         if line_ind > user_data.selected_peak:
             dpg.set_item_alias(line, f'spect_line_{line_ind-1}')
     peak_select_update(sender, app_data, user_data)
@@ -474,7 +474,7 @@ def hide_splitting_sliders(keep=0):
     """
     for child in dpg.get_item_children('pwi_top', 1)[2:][keep:]:
         dpg.hide_item(child)
-        dpg.hide_item('coupling' + dpg.get_item_alias(child).lstrip('split'))
+        dpg.hide_item('coupling' + dpg.get_item_alias(child).removeprefix('split'))
 
 
 def peak_info_update(user_data):
@@ -515,8 +515,8 @@ def peak_info_update(user_data):
 
 def update_coupling_callback(sender, app_data, user_data):
     peak = user_data.spectrum.peaks[user_data.selected_peak]
-    ind = sender.lstrip('coupling')
-    mult = dpg.get_value('split'+sender.lstrip('coupling'))
+    ind = sender.removeprefix('coupling')
+    mult = dpg.get_value('split' + ind)
     peak.change_splitting(ind=int(ind), mult=mult, J=app_data)
 
     sel, label = selected_peak_label(user_data)
@@ -527,12 +527,12 @@ def update_coupling_callback(sender, app_data, user_data):
 
 def update_splitting_callback(sender, app_data, user_data):
     peak = user_data.spectrum.peaks[user_data.selected_peak]
-    ind = sender.lstrip('split')
-    J = dpg.get_value('coupling'+sender.lstrip('split'))
+    ind = sender.removeprefix('split')
+    J = dpg.get_value('coupling' + ind)
     peak.change_splitting(ind=int(ind), mult=app_data, J=J)
 
     dpg.set_item_label(sender, f'J{ind},{mult_map[app_data]}')
-    dpg.set_item_label('coupling'+sender.lstrip('split'), f'J{ind}')
+    dpg.set_item_label('coupling' + ind, f'J{ind}')
 
     sel, label = selected_peak_label(user_data)
     update_peak_plot(user_data.spectrum, ind=sel, label=label)
