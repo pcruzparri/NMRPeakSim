@@ -101,5 +101,9 @@ nmrpeaksim/
 tests/
 ```
 
-`assets/NMRPeakSim.exe` is a prebuilt Windows binary from an earlier build. It predates
-the current source and is kept only as a packaging reference — build from source instead.
+## Releases
+
+Tagging a commit `vX.Y.Z` builds a standalone Windows executable and publishes it on the
+[Releases](https://github.com/pcruzparri/NMRPeakSim/releases) page. The tag has to match
+the version in `pyproject.toml` or the build fails rather than shipping a mislabelled
+binary. Nothing built is committed to the repo.
