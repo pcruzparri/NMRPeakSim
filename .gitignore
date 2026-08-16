@@ -1,3 +1,21 @@
 __pycache__
 .ipynb_checkpoints
 .idea
+
+# Virtual environments
+.venv
+venv
+env
+
+# Packaging and build output
+build/
+dist/
+*.egg-info/
+
+# Test and coverage output
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Agent worktrees
+.claude/
