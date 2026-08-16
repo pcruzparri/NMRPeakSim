@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from nmrpeaksim.core.core import Peak, Spectrum, Plot
-from nmrpeaksim.core.utils import Pascals_triangle, lorentzian, gaussian
+from nmrpeaksim.core.utils import Pascals_triangle, lorentzian, gaussian, vline
 
 
 # ---------------------------------------------------------------------------
@@ -337,3 +337,92 @@ def test_plot_peak_rejects_degenerate_npts(npts):
     p.add_peak(center_shift=1.5)
     with pytest.raises(ValueError, match='npts must be at least 2'):
         p.plot_peak(peak_int=0)
+
+
+# ---------------------------------------------------------------------------
+# Stick spectra (zero linewidth / curve="vline")
+# ---------------------------------------------------------------------------
+
+def test_vline_emits_three_points_per_stick():
+    x, y = vline([2.0, 1.0], [4.0, 8.0])
+    # Three points per stick keeps every segment vertical or along the baseline;
+    # two would draw a diagonal from each stick's top to the next stick's base.
+    assert list(x) == [2.0, 2.0, 2.0, 1.0, 1.0, 1.0]
+    assert list(y) == [0.0, 4.0, 0.0, 0.0, 8.0, 0.0]
+
+
+def test_vline_margin_pads_both_ends():
+    x, y = vline([1.5], [1.0], margin=0.05)
+    assert np.isclose(x[0], 1.55) and np.isclose(x[-1], 1.45)
+    assert y[0] == 0.0 and y[-1] == 0.0
+
+
+def test_zero_fwhm_produces_no_nan():
+    p = Plot(fwhm=0)
+    p.add_peak(center_shift=1.5, integration=1)
+    p.peaks[0].split_peak(mult=2, J=7)
+    x, y = p.plot_peak(0)
+    assert not np.isnan(y).any()
+    assert not np.isnan(x).any()
+
+
+def test_zero_fwhm_singlet_has_a_usable_x_range():
+    # update_peak_plot sets the axis from x[-1]..x[0]; a lone stick would
+    # otherwise give a zero-width axis.
+    p = Plot(fwhm=0, stick_margin=0.05)
+    p.add_peak(center_shift=1.5)
+    x, _ = p.plot_peak(0)
+    assert np.isclose(x[0], 1.55) and np.isclose(x[-1], 1.45)
+    assert x[0] > x[-1]
+
+
+def test_stick_heights_track_intensities():
+    p = Plot(fwhm=0)
+    p.add_peak(center_shift=1.5, integration=1)
+    p.peaks[0].split_peak(mult=3, J=7)      # 1:2:1
+    _, y = p.plot_peak(0)
+    heights = [v for v in y if v > 0]
+    assert np.isclose(heights[1] / heights[0], 2.0)
+    assert np.isclose(heights[1] / heights[2], 2.0)
+
+
+def test_stick_point_count():
+    p = Plot(fwhm=0)
+    p.add_peak(center_shift=1.5)
+    p.peaks[0].split_peak(mult=3, J=7)
+    x, y = p.plot_peak(0)
+    assert len(x) == len(y) == 3 * 3 + 2   # three points per stick, plus margins
+
+
+def test_vline_curve_works_with_nonzero_fwhm():
+    p = Plot(fwhm=0.004)
+    p.add_peak(center_shift=1.5)
+    p.peaks[0].split_peak(mult=2, J=7)
+    x, y = p.plot_peak(0, curve='vline')
+    assert len(x) == 2 * 3 + 2
+
+
+@pytest.mark.parametrize('curve,rtol', [('gaussian', 1e-6), ('lorentzian', 0.05)])
+def test_stick_height_matches_curve_at_stick_fwhm(curve, rtol):
+    # Dropping FWHM to zero should change the representation, not the scale.
+    # Lorentzian gets a looser tolerance: the curve path truncates at
+    # +/-10*FWHM and loses ~3% of its heavy tails, which inflates its height.
+    ref = 0.001
+    c = Plot(npts=200000, fwhm=ref)
+    c.add_peak(center_shift=1.5, integration=1)
+    c.peaks[0].split_peak(mult=3, J=7)
+    _, cy = c.plot_peak(0, curve=curve)
+
+    s = Plot(fwhm=0, stick_fwhm=ref)
+    s.add_peak(center_shift=1.5, integration=1)
+    s.peaks[0].split_peak(mult=3, J=7)
+    _, sy = s.plot_peak(0, curve=curve)
+
+    assert np.isclose(sy.max(), cy.max(), rtol=rtol)
+
+
+def test_unknown_curve_names_the_valid_options():
+    p = Plot()
+    p.add_peak(center_shift=1.5)
+    with pytest.raises(ValueError, match="gaussian.*lorentzian.*vline"):
+        p.plot_peak(0, curve='triangle')
