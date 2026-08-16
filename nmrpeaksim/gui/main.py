@@ -99,7 +99,7 @@ def main():
                                             tag='fwhm',
                                             default_value=data.spectrum.fwhm,
                                             step_fast=0.01,
-                                            step=0.001,
+                                            step=data.spectrum.stick_fwhm,
                                             min_value=0,
                                             min_clamped=True,
                                             user_data=data,

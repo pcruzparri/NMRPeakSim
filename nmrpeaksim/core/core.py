@@ -116,6 +116,8 @@ class Plot(Spectrum):
                  intensity_min=0,
                  intensity_max=1,
                  fwhm=0.004,
+                 stick_fwhm=0.001,
+                 stick_margin=0.05,
                  **kwargs):
         super().__init__()
         self.npts = npts
@@ -124,6 +126,11 @@ class Plot(Spectrum):
         self.intensity_min = intensity_min
         self.intensity_max = intensity_max
         self.fwhm = fwhm
+        # Sticks are drawn at the height the curve would have at stick_fwhm, so
+        # dropping the linewidth to zero changes the representation without
+        # rescaling the plot. Keep it equal to the FWHM widget's step in main().
+        self.stick_fwhm = stick_fwhm
+        self.stick_margin = stick_margin
         self.kwargs = kwargs
 
         #self.ppm = np.linspace(ppm_min, ppm_max, int(npts))
@@ -132,26 +139,32 @@ class Plot(Spectrum):
         """
         Parameters:
         curve: str
-        "lorentzian" or "gaussian"
+        "lorentzian", "gaussian", or "vline"
         """
+        if curve != 'vline' and curve not in lineshapes:
+            raise ValueError(f"Unknown lineshape {curve!r}; expected one of "
+                             f"{sorted(lineshapes) + ['vline']}.")
+
+        peak = self.peaks[peak_int]
+        inten, subshifts = peak.get_subpeaks()
+
+        # Zero linewidth is a stick spectrum: the FWHM -> 0 limit of either
+        # lineshape is a delta at each subpeak.
+        if curve == 'vline' or self.fwhm == 0:
+            shape = curve if curve in lineshapes else 'lorentzian'
+            scale = peak.integration / sum(inten) * unit_peak_height[shape](self.stick_fwhm)
+            return vline(subshifts, [i * scale for i in inten], margin=self.stick_margin)
 
         npts = int(self.npts)
         if npts < 2:
             raise ValueError(f'npts must be at least 2 to define a lineshape, got {npts}.')
 
-        inten, subshifts = self.peaks[peak_int].get_subpeaks()
         ppm_points = np.linspace(subshifts[0]+10*self.fwhm, subshifts[-1]-10*self.fwhm, npts)
-
-        if curve in ['gaussian', 'lorentzian']:
-            pk = np.sum(np.array([eval(curve)(ppm_points, subshifts[i], inten[i], self.fwhm)
-                                 for i in range(len(inten))]), axis=0)
-            # Scale so the Riemann sum over the window equals the integration.
-            dx = abs(ppm_points[0] - ppm_points[1])
-            peak = pk*self.peaks[peak_int].integration/(np.sum(pk)*dx)
-        else:
-            raise ValueError('Please pass the correct lineshape using the curve parameter.')
-
-        return ppm_points, peak
+        pk = np.sum(np.array([lineshapes[curve](ppm_points, subshifts[i], inten[i], self.fwhm)
+                              for i in range(len(inten))]), axis=0)
+        # Scale so the Riemann sum over the window equals the integration.
+        dx = abs(ppm_points[0] - ppm_points[1])
+        return ppm_points, pk*peak.integration/(np.sum(pk)*dx)
 
     def plot_all(self, **kwargs):
         return (self.plot_peak(peak_int=i, **kwargs) for i in range(len(self.peaks)))

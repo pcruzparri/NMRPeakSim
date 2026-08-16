@@ -62,6 +62,11 @@ of the exercise.
 The plotted lineshape is a sum of Lorentzians (or Gaussians) over the subpeaks, scaled
 so the area under the curve equals the peak's integration.
 
+Dropping the linewidth to zero gives a stick spectrum instead — the zero-width limit of
+either lineshape is a delta at each subpeak. The sticks are drawn at the height the curve
+would have at the narrowest linewidth the FWHM control can reach, so switching between
+the two changes the representation without rescaling the plot.
+
 ## Limitations
 
 This is a **first-order** simulation. Every multiplet is built from independent binomial
@@ -69,8 +74,8 @@ splittings, so it won't reproduce second-order effects — no roofing, no leanin
 that shows up when Δδ is comparable to J. Strongly coupled systems will look wrong in a
 way the simulation can't warn you about.
 
-Linewidth is a single global FWHM shared by every peak. Setting it to zero currently
-produces an empty plot rather than a stick spectrum.
+Linewidth is a single global FWHM shared by every peak — you can't broaden one resonance
+without broadening all of them.
 
 ## Development
 
