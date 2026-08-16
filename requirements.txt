@@ -1,2 +1,2 @@
-numpy
-dearpygui
+numpy==2.2.6
+dearpygui==2.3.1
