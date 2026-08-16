@@ -1,0 +1,52 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      # Install non-editable: an editable install leaves PyInstaller's analysis
+      # pointing at the source tree and it misses the package data.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install . pyinstaller
+
+      - name: Check the tag matches the package version
+        shell: bash
+        run: |
+          version=$(python -c "import importlib.metadata as m; print(m.version('nmrpeaksim'))")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$tag" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match pyproject version $version"
+            exit 1
+          fi
+          echo "tag $GITHUB_REF_NAME matches version $version"
+
+      # --collect-all is load-bearing: dearpygui's compiled extension and data
+      # files are invisible to PyInstaller's import analysis, and without it the
+      # exe builds cleanly and then dies on launch.
+      - name: Build the executable
+        run: >
+          pyinstaller --onefile --windowed --name NMRPeakSim
+          --collect-all dearpygui nmrpeaksim/gui/main.py
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$env:GITHUB_REF_NAME" dist/NMRPeakSim.exe --generate-notes
