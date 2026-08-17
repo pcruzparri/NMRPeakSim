@@ -4,8 +4,7 @@ Interactive simulator for first-order NMR multiplets. Build a spectrum peak by p
 split each one with J-couplings, and watch the lineshape and coupling tree update as you
 drag the sliders.
 
-Useful for teaching, and for checking a splitting pattern you're trying to assign. It
-doesn't fit real data.
+Useful for teaching, and for checking a first-order splitting pattern you're trying to assign. 
 
 ## Install
 
@@ -51,13 +50,14 @@ Four panels across the top, spectrum along the bottom.
   live.
 - **Tools**: two tabs. *Peak* creates, removes, splits, and shifts peaks. *Plot* controls
   the point count, linewidth, axis ranges, and zoom.
+- **Spectrum View**: the full spectrum, with all peaks and their lineshapes. 
 
 ## How a peak is built
 
 Each `Peak` starts as a singlet and accumulates splitting levels. Every call to
 `split_peak(mult, J)` takes the current set of subpeaks and splits each one into `mult`
 lines separated by `J` Hz, with intensities from the corresponding row of Pascal's
-triangle. Multiplicities from 1 to 9 are supported (s, d, t, q, qnt, sxt, spt, oct, non).
+triangle. Multiplicities from 1 to 9 are supported (s, d, t, q, qnt, sxt, spt, oct, non). 
 
 Positions are stored in ppm and converted using the spectrometer frequency, so changing
 the field moves the lines in ppm while J stays fixed in Hz.
@@ -74,11 +74,9 @@ not rescale when you switch.
 
 This is a **first-order** simulation. Every multiplet is built from independent binomial
 splittings, so it will not reproduce second-order effects like roofing or leaning, which
-appear when Δδ is comparable to J. Strongly coupled systems will look wrong and the
-simulation will not warn you.
+appear when Δδ is comparable to J. Strongly coupled systems will look wrong.
 
-Linewidth is a single global FWHM shared by every peak, so you cannot broaden one
-resonance without broadening all of them.
+Linewidth is a single global FWHM shared by every peak, so broadening one resonance broadens all of them.
 
 ## Development
 
